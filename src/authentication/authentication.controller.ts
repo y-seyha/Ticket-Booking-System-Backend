@@ -253,8 +253,6 @@ export class AuthenticationController {
     };
   }
 
-
-
   @Get('discord')
   @UseGuards(AuthGuard('discord'))
   discordAuth() {}
