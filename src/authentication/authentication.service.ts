@@ -15,6 +15,9 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { Response } from 'express';
+import * as speakeasy from 'speakeasy';
+import * as QRCode from 'qrcode';
+import * as crypto from 'crypto';
 
 type DeviceInfo = {
   deviceName?: string;
@@ -172,6 +175,9 @@ export class AuthenticationService {
     try {
       const account = await this.prisma.account.findUnique({
         where: { email: key },
+        include: {
+          twoFactorAuth: true,
+        },
       });
 
       if (!account) {
@@ -200,6 +206,19 @@ export class AuthenticationService {
 
       if (!match) {
         throw new UnauthorizedException('Invalid email or password');
+      }
+
+
+      if (account.twoFactorEnabled) {
+        const tempToken = this.jwt.sign(
+            { sub: account.id, type: '2fa-pending' },
+            { expiresIn: '5m' },
+        );
+
+        return {
+          requiresTwoFactor: true,
+          tempToken
+        };
       }
 
       await this.prisma.account.update({
@@ -434,7 +453,180 @@ export class AuthenticationService {
     return account;
   }
 
-   async issueTokens(account: any, req: any, device?: DeviceInfo) {
+  async setup2FA(userId: string) {
+    const account = await this.prisma.account.findUnique({
+      where: { id: userId },
+    });
+
+    if (!account) {
+      throw new BadRequestException('Account not found');
+    }
+
+    const secret = speakeasy.generateSecret({
+      name: `YourApp (${account.email})`,
+    });
+
+    const qrCode = await QRCode.toDataURL(secret.otpauth_url!);
+
+    await this.prisma.twoFactorAuth.upsert({
+      where: { accountId: userId },
+      update: {
+        secretEncrypted: this.encrypt(secret.base32),
+        method: 'TOTP',
+      },
+      create: {
+        accountId: userId,
+        secretEncrypted: this.encrypt(secret.base32),
+        method: 'TOTP',
+      },
+    });
+
+    return {
+      qrCode,
+      secret: secret.base32,
+    };
+  }
+
+  async enable2FA(userId: string, code: string) {
+    const account = await this.prisma.account.findUnique({
+      where: { id: userId },
+      include: { twoFactorAuth: true },
+    });
+
+    if (!account?.twoFactorAuth) {
+      throw new BadRequestException('2FA not configured');
+    }
+
+    if (account.twoFactorEnabled) {
+      return { message: '2FA already enabled' };
+    }
+
+    const secret = this.decrypt(account.twoFactorAuth.secretEncrypted);
+
+    const verified = speakeasy.totp.verify({
+      secret,
+      encoding: 'base32',
+      token: code,
+      window: 1,
+    });
+
+    if (!verified) {
+      throw new BadRequestException('Invalid code');
+    }
+
+    await this.prisma.account.update({
+      where: { id: userId },
+      data: { twoFactorEnabled: true },
+    });
+
+    await this.prisma.twoFactorAuth.update({
+      where: { accountId: userId },
+      data: { enabledAt: new Date() },
+    });
+
+    return {
+      message: '2FA enabled successfully',
+    };
+  }
+
+  async verify2FA(tempToken: string, code: string, req: any) {
+    let payload: any;
+
+    try {
+      payload = this.jwt.verify(tempToken);
+    } catch {
+      throw new UnauthorizedException('Expired or invalid session');
+    }
+
+    if (payload.type !== '2fa-pending') {
+      throw new UnauthorizedException('Invalid 2FA session');
+    }
+
+    const account = await this.prisma.account.findUnique({
+      where: { id: payload.sub },
+      include: { twoFactorAuth: true },
+    });
+
+
+    if (!account?.twoFactorAuth) {
+      throw new UnauthorizedException('2FA not enabled');
+    }
+
+    const secret = this.decrypt(account.twoFactorAuth.secretEncrypted);
+
+    const valid = speakeasy.totp.verify({
+      secret,
+      encoding: 'base32',
+      token: code,
+      window: 1,
+    });
+
+    if (!valid) {
+      throw new UnauthorizedException('Invalid code');
+    }
+
+    return this.issueTokens(account, req);
+  }
+
+  private encrypt(text: string): string {
+    const iv = crypto.randomBytes(12);
+
+    const key = crypto
+        .createHash('sha256')
+        .update(process.env.ENCRYPTION_KEY!)
+        .digest();
+
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+
+    const encrypted = Buffer.concat([
+      cipher.update(text, 'utf8'),
+      cipher.final(),
+    ]);
+
+    const tag = cipher.getAuthTag();
+
+    return [
+      iv.toString('hex'),
+      tag.toString('hex'),
+      encrypted.toString('hex'),
+    ].join(':');
+  }
+
+  private decrypt(payload: string): string {
+    if (!payload || typeof payload !== 'string') {
+      throw new BadRequestException('Invalid encrypted payload');
+    }
+
+    const parts = payload.split(':');
+
+    if (parts.length !== 3) {
+      throw new BadRequestException('Corrupted encryption format');
+    }
+
+    const [ivHex, tagHex, encryptedHex] = parts;
+
+    const iv = Buffer.from(ivHex, 'hex');
+    const tag = Buffer.from(tagHex, 'hex');
+    const encryptedText = Buffer.from(encryptedHex, 'hex');
+
+    const key = crypto
+        .createHash('sha256')
+        .update(process.env.ENCRYPTION_KEY!)
+        .digest();
+
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+
+    decipher.setAuthTag(tag);
+
+    const decrypted = Buffer.concat([
+      decipher.update(encryptedText),
+      decipher.final(),
+    ]);
+
+    return decrypted.toString('utf8');
+  }
+
+  async issueTokens(account: any, req: any, device?: DeviceInfo) {
     const sessionId = crypto.randomUUID();
     const deviceId = crypto.randomUUID();
 

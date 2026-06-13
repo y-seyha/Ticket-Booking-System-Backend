@@ -68,9 +68,49 @@ export class AuthenticationController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.auth.login(dto, req);
+    if ('requiresTwoFactor' in result) {
+      return result;
+    }
+    this.setCookies(res, result);
+    return {
+      user: result.user,
+    };
+  }
+
+  @Post('2fa/setup')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Generate QR code for 2FA setup' })
+  async setup2FA(@CurrentUser() user: any) {
+    return this.auth.setup2FA(user.id);
+  }
+
+  @Post('2fa/enable')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Enable 2FA after verifying code' })
+  async enable2FA(
+      @CurrentUser() user: any,
+      @Body('code') code: string,
+  ) {
+    return this.auth.enable2FA(user.id, code);
+  }
+
+  @Post('2fa/verify')
+  async verify2FA(
+      @Body('tempToken') tempToken: string,
+      @Body('code') code: string,
+      @Req() req: any,
+      @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.auth.verify2FA(tempToken, code, req);
+
     this.setCookies(res, result);
 
-    return { user: result.user };
+    return {
+      success: true,
+      user: result.user,
+    };
   }
 
   @Post('forgot-password')
