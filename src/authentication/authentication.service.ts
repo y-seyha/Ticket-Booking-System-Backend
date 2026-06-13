@@ -376,7 +376,65 @@ export class AuthenticationService {
     return { message: 'Logged out successfully' };
   }
 
-  private async issueTokens(account: any, req: any, device?: DeviceInfo) {
+  async validateOAuthLogin(profile: any) {
+    const { provider, providerUserId, email, displayName } = profile;
+
+    const safeEmail = email ?? null;
+
+    let oauth = await this.prisma.oAuthAccount.findUnique({
+      where: {
+        provider_providerUserId: {
+          provider,
+          providerUserId,
+        },
+      },
+      include: { account: true },
+    });
+
+    if (oauth) {
+      return oauth.account;
+    }
+
+    if (!safeEmail) {
+      throw new BadRequestException(
+          `${provider} did not return email. Enable email permission.`
+      );
+    }
+
+    let account = await this.prisma.account.findUnique({
+      where: { email: safeEmail },
+    });
+
+    if (!account) {
+      account = await this.prisma.account.create({
+        data: {
+          email: safeEmail,
+          emailVerified: true,
+          profile: {
+            create: {
+              firstName: displayName ?? 'User',
+              lastName: '',
+              status: 'ACTIVE',
+            },
+          },
+        },
+      });
+    }
+
+    await this.prisma.oAuthAccount.create({
+      data: {
+        accountId: account.id,
+        provider,
+        providerUserId,
+        providerEmail: safeEmail,
+        displayName,
+      },
+    });
+
+    return account;
+  }
+
+   async issueTokens(account: any, req: any, device?: DeviceInfo) {
     const sessionId = crypto.randomUUID();
     const deviceId = crypto.randomUUID();
 
@@ -432,6 +490,7 @@ export class AuthenticationService {
       user: payload,
     };
   }
+
   private handlePrismaError(error: any): never {
     if (error?.code === 'P2002') {
       const target = error.meta?.target;

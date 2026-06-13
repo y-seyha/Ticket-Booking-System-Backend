@@ -30,6 +30,7 @@ import { CustomerThrottlerInterceptor } from './interceptor/customer-throttler.i
 import { CustomerThrottlerGuard } from './guards/customer-throttler.guard';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import {AuthGuard} from "@nestjs/passport";
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -131,6 +132,113 @@ export class AuthenticationController {
   @ApiResponse({ status: 200, description: 'Logged out successfully' })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     return this.auth.logout(req, res);
+  }
+
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  googleAuth() {}
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleCallback(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+    const account = await this.auth.validateOAuthLogin(req.user);
+
+    const tokens = await this.auth.issueTokens(account, req, {
+      userAgent: req.headers['user-agent'],
+      ip: req.ip,
+    });
+
+    this.setCookies(res, tokens);
+
+    // return res.redirect('http://localhost:3000');
+
+    return {
+      success: true,
+      message: 'Google login successful',
+      user: tokens.user,
+      accessToken: tokens.accessToken,
+    };
+  }
+
+
+  @Get('github')
+  @UseGuards(AuthGuard('github'))
+  githubAuth() {}
+
+  @Get('github/callback')
+  @UseGuards(AuthGuard('github'))
+  async githubCallback(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+    const account = await this.auth.validateOAuthLogin(req.user);
+
+    const tokens = await this.auth.issueTokens(account, req, {
+      userAgent: req.headers['user-agent'],
+      ip: req.ip,
+    });
+
+    this.setCookies(res, tokens);
+
+    // return res.redirect('http://localhost:3000');
+
+    return {
+      success: true,
+      message: 'Github login successful',
+      user: tokens.user,
+      accessToken: tokens.accessToken,
+    };
+  }
+
+  @Get('facebook')
+  @UseGuards(AuthGuard('facebook'))
+  facebookAuth() {}
+
+  @Get('facebook/callback')
+  @UseGuards(AuthGuard('facebook'))
+  async facebookCallback(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+    const account = await this.auth.validateOAuthLogin(req.user);
+
+    const tokens = await this.auth.issueTokens(account, req, {
+      userAgent: req.headers['user-agent'],
+      ip: req.ip,
+    });
+
+    this.setCookies(res, tokens);
+
+    // return res.redirect('http://localhost:3000');
+
+    return {
+      success: true,
+      message: 'Facebook login successful',
+      user: tokens.user,
+      accessToken: tokens.accessToken,
+    };
+  }
+
+
+
+  @Get('discord')
+  @UseGuards(AuthGuard('discord'))
+  discordAuth() {}
+
+  @Get('discord/callback')
+  @UseGuards(AuthGuard('discord'))
+  async discordCallback(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+    const account = await this.auth.validateOAuthLogin(req.user);
+
+    const tokens = await this.auth.issueTokens(account, req, {
+      userAgent: req.headers['user-agent'],
+      ip: req.ip,
+    });
+
+    this.setCookies(res, tokens);
+
+    // return res.redirect('http://localhost:3000');
+
+    return {
+      success: true,
+      message: 'Discord login successful',
+      user: tokens.user,
+      accessToken: tokens.accessToken,
+    };
   }
 
   private setCookies(res: Response, tokens: any) {
