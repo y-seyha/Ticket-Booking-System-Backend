@@ -1,0 +1,478 @@
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import * as bcrypt from 'bcrypt';
+import { JwtService } from '@nestjs/jwt';
+import { MailerService } from '../utils/generateEmail';
+import { PasswordResetToken, VerificationToken } from '@prisma/client';
+import { CustomerThrottlerStore } from './throttler/customer-throttler.store';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { Response } from 'express';
+
+type DeviceInfo = {
+  deviceName?: string;
+  deviceType?: string;
+  ip?: string;
+  userAgent?: string;
+};
+
+@Injectable()
+export class AuthenticationService {
+  private readonly logger = new Logger(AuthenticationService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private jwt: JwtService,
+    private readonly mailerService: MailerService,
+    private throttlerStore: CustomerThrottlerStore,
+  ) {}
+
+  async register(dto: RegisterDto) {
+    try {
+      const emailExists = await this.prisma.account.findUnique({
+        where: { email: dto.email },
+      });
+
+      const existingAccount = await this.prisma.account.findUnique({
+        where: { email: dto.email },
+      });
+
+      if (existingAccount) {
+        if (existingAccount.emailVerified) {
+          throw new BadRequestException('Email already exists');
+        }
+
+        const rawToken = crypto.randomUUID();
+        const tokenHash = await bcrypt.hash(rawToken, 10);
+
+        await this.prisma.verificationToken.create({
+          data: {
+            accountId: existingAccount.id,
+            tokenHash,
+            type: 'EMAIL',
+            expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+          },
+        });
+
+        await this.mailerService.sendVerificationEmail(
+          existingAccount.email,
+          rawToken,
+        );
+
+        return {
+          message:
+            'Account exists but not verified. Verification email resent.',
+        };
+      }
+
+      if (emailExists) {
+        throw new BadRequestException('Email already exists');
+      }
+
+      if (dto.phone) {
+        const phoneExists = await this.prisma.userProfile.findUnique({
+          where: { phone: dto.phone },
+        });
+
+        if (phoneExists) {
+          throw new BadRequestException('Phone already exists');
+        }
+      }
+
+      const hash = await bcrypt.hash(dto.password, 10);
+
+      const account = await this.prisma.account.create({
+        data: {
+          email: dto.email,
+          passwordHash: hash,
+          profile: {
+            create: {
+              firstName: dto.firstName,
+              lastName: dto.lastName,
+              phone: dto.phone,
+              status: 'ACTIVE',
+            },
+          },
+        },
+        include: { profile: true },
+      });
+
+      const rawToken = crypto.randomUUID();
+      const tokenHash = await bcrypt.hash(rawToken, 10);
+
+      await this.prisma.verificationToken.create({
+        data: {
+          accountId: account.id,
+          tokenHash,
+          type: 'EMAIL',
+          expiresAt: new Date(Date.now() + 1000 * 60 * 5), // 5mns
+        },
+      });
+
+      await this.mailerService.sendVerificationEmail(account.email, rawToken);
+
+      this.logger.log(`User registered (verification sent): ${account.email}`);
+
+      return {
+        message: 'Account created. Please verify your email.',
+      };
+    } catch (error: any) {
+      this.handlePrismaError(error);
+    }
+  }
+
+  async verifyEmail(token: string) {
+    const tokens = await this.prisma.verificationToken.findMany({
+      where: {
+        type: 'EMAIL',
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    let matchedToken: VerificationToken | null = null;
+
+    for (const t of tokens) {
+      const isValid = await bcrypt.compare(token, t.tokenHash);
+      if (isValid) {
+        matchedToken = t;
+        break;
+      }
+    }
+
+    if (!matchedToken) {
+      throw new BadRequestException('Invalid or expired token');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.account.update({
+        where: { id: matchedToken.accountId },
+        data: { emailVerified: true },
+      }),
+
+      this.prisma.verificationToken.update({
+        where: { id: matchedToken.id },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    return true;
+  }
+
+  async login(dto: LoginDto, req: any) {
+    const key = dto.email;
+
+    try {
+      const account = await this.prisma.account.findUnique({
+        where: { email: key },
+      });
+
+      if (!account) {
+        throw new UnauthorizedException('Invalid email or password');
+      }
+
+      //lock
+      if (account.lockedUntil && account.lockedUntil > new Date()) {
+        throw new UnauthorizedException('Account temporarily locked');
+      }
+
+      if (!account.emailVerified) {
+        throw new UnauthorizedException('Please verify your email');
+      }
+
+      if (!account.passwordHash) {
+        throw new UnauthorizedException(
+            'This account uses social login. Please sign in with Google, Github, Facebook, or Discord.',
+        );
+      }
+
+      const match = await bcrypt.compare(
+          dto.password,
+          account.passwordHash,
+      );
+
+      if (!match) {
+        throw new UnauthorizedException('Invalid email or password');
+      }
+
+      await this.prisma.account.update({
+        where: { id: account.id },
+        data: {
+          lastLoginAt: new Date(),
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        },
+      });
+
+      this.throttlerStore.reset(key);
+
+      this.logger.log(`Login success: ${account.email}`);
+
+      return this.issueTokens(account, req, {
+        deviceName: req.headers['user-agent'],
+        deviceType: this.detectDevice(req),
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+    } catch (error) {
+      const current = this.throttlerStore.get(key);
+
+      const newCount = (current?.count ?? 0) + 1;
+
+      let lockedUntil: number | undefined;
+
+      if (newCount >= 10) {
+        lockedUntil = Date.now() + 5 * 60 * 1000;
+      }
+
+      await this.prisma.account.update({
+        where: { email: key },
+        data: {
+          failedLoginAttempts: newCount,
+          lockedUntil: lockedUntil ? new Date(lockedUntil) : null,
+        },
+      });
+
+      this.throttlerStore.set(key, {
+        count: newCount,
+        lockedUntil,
+      });
+
+      throw error;
+    }
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const account = await this.prisma.account.findUnique({
+      where: { email: dto.email },
+    });
+
+    // always return success
+    if (!account) {
+      return { message: 'Reset Link already sent to your email account' };
+    }
+
+    const rawToken = crypto.randomUUID();
+    const tokenHash = await bcrypt.hash(rawToken, 10);
+
+    await this.prisma.passwordResetToken.create({
+      data: {
+        accountId: account.id,
+        tokenHash,
+        expiresAt: new Date(Date.now() + 1000 * 60 * 5), // 5 min
+      },
+    });
+
+    await this.mailerService.sendResetPasswordEmail(account.email, rawToken);
+
+    return { message: 'If email exists, reset link sent' };
+  }
+
+  async resetPassword(token: string, dto: ResetPasswordDto) {
+    const { newPassword, confirmNewPassword } = dto;
+
+    if (newPassword !== confirmNewPassword) {
+      throw new BadRequestException('Passwords do not match');
+    }
+
+    const tokens = await this.prisma.passwordResetToken.findMany({
+      where: {
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    let matched: PasswordResetToken | null = null;
+
+    for (const t of tokens) {
+      const isValid = await bcrypt.compare(token, t.tokenHash);
+
+      if (isValid) {
+        matched = t;
+        break;
+      }
+    }
+
+    if (!matched) {
+      throw new BadRequestException('Invalid or expired token');
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Transaction: update password + mark token used
+    await this.prisma.$transaction([
+      this.prisma.account.update({
+        where: { id: matched.accountId },
+        data: {
+          passwordHash: hashedPassword,
+        },
+      }),
+
+      this.prisma.passwordResetToken.update({
+        where: { id: matched.id },
+        data: {
+          usedAt: new Date(),
+        },
+      }),
+    ]);
+
+    return {
+      message: 'Password reset successful',
+    };
+  }
+
+  async logout(req: any, res: Response) {
+    const userId = req.user.sub;
+    const refreshToken = req.cookies?.refresh_token;
+
+    let session: any = null;
+
+    //find refresh token
+    if (refreshToken) {
+      const tokens = await this.prisma.refreshToken.findMany({
+        where: {
+          accountId: userId,
+          revokedAt: null,
+        },
+      });
+
+      for (const t of tokens) {
+        const match = await bcrypt.compare(refreshToken, t.tokenHash);
+
+        if (match) {
+          session = t;
+          await this.prisma.refreshToken.update({
+            where: { id: t.id },
+            data: { revokedAt: new Date() },
+          });
+          break;
+        }
+      }
+    }
+
+    if (session) {
+      await this.prisma.loginSession.updateMany({
+        where: {
+          accountId: userId,
+          refreshTokenId: session.id,
+        },
+        data: {
+          isActive: false,
+          lastActiveAt: new Date(),
+        },
+      });
+    }
+
+    this.clearCookies(res);
+
+    return { message: 'Logged out successfully' };
+  }
+
+  private async issueTokens(account: any, req: any, device?: DeviceInfo) {
+    const sessionId = crypto.randomUUID();
+    const deviceId = crypto.randomUUID();
+
+    const payload = {
+      sub: account.id,
+      email: account.email,
+      sid: sessionId,
+    };
+
+    const accessToken = this.jwt.sign(payload, { expiresIn: '15m' });
+    const refreshToken = this.jwt.sign(payload, { expiresIn: '7d' });
+
+    const tokenHash = await bcrypt.hash(refreshToken, 10);
+
+    const refreshTokenRecord = await this.prisma.refreshToken.create({
+      data: {
+        accountId: account.id,
+        tokenHash,
+
+        deviceId,
+
+        ipAddress: device?.ip ?? req.ip ?? null,
+
+        deviceInfo: JSON.stringify({
+          userAgent: req.headers['user-agent'],
+          deviceType: this.detectDevice(req),
+          deviceName: device?.deviceName ?? null,
+        }),
+
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    await this.prisma.loginSession.create({
+      data: {
+        accountId: account.id,
+        refreshTokenId: refreshTokenRecord.id,
+
+        deviceName: device?.deviceName ?? req.headers['user-agent'] ?? null,
+        deviceType: device?.deviceType ?? this.detectDevice(req),
+
+        ipAddress: device?.ip ?? req.ip ?? null,
+        userAgent: device?.userAgent ?? req.headers['user-agent'] ?? null,
+
+        isActive: true,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    return {
+      accessToken,
+      refreshToken,
+      user: payload,
+    };
+  }
+  private handlePrismaError(error: any): never {
+    if (error?.code === 'P2002') {
+      const target = error.meta?.target;
+
+      if (Array.isArray(target)) {
+        if (target.includes('email')) {
+          throw new BadRequestException('Email already exists');
+        }
+
+        if (target.includes('phone')) {
+          throw new BadRequestException('Phone already exists');
+        }
+      }
+
+      throw new BadRequestException('Unique constraint violation');
+    }
+
+    throw error;
+  }
+
+  private clearCookies(res: Response) {
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    res.clearCookie('access_token', {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+    });
+
+    res.clearCookie('refresh_token', {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+    });
+  }
+
+  private detectDevice(req: any): string {
+    const ua = req.headers['user-agent'] || '';
+
+    if (/mobile/i.test(ua)) return 'MOBILE';
+    if (/tablet/i.test(ua)) return 'TABLET';
+    return 'DESKTOP';
+  }
+}

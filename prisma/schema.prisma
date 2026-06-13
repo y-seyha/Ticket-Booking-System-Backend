@@ -1,0 +1,222 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum TokenType {
+  EMAIL
+  PHONE
+}
+
+enum TwoFactorMethod {
+  TOTP
+  SMS
+  EMAIL
+}
+
+enum Role {
+  ADMIN
+  USER
+  CASHIER
+}
+
+enum AuthProvider {
+  GOOGLE
+  GITHUB
+  FACEBOOK
+  DISCORD
+}
+
+enum UserProfileStatus {
+  ACTIVE
+  BANNED
+  DELETED
+}
+
+model Account {
+  id           String @id @default(uuid())
+  email        String @unique
+  passwordHash String?
+
+  role         Role @default(USER)
+
+  status AccountStatus @default(ACTIVE)
+
+  emailVerified    Boolean @default(false)
+  phoneVerified    Boolean @default(false)
+  twoFactorEnabled Boolean @default(false)
+
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile             UserProfile?
+
+  oauthAccounts OAuthAccount[]
+
+  refreshTokens       RefreshToken[]
+  verificationTokens  VerificationToken[]
+  passwordResetTokens PasswordResetToken[]
+  twoFactorAuth       TwoFactorAuth?
+  loginSessions       LoginSession[]
+}
+
+model UserProfile {
+  id        String @id @default(uuid())
+  accountId String @unique
+
+  firstName String
+  lastName  String
+  phone     String? @unique
+  avatarUrl String?
+  status UserProfileStatus
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model RefreshToken {
+  id        String @id @default(uuid())
+  accountId String
+
+  tokenHash String
+
+  deviceId   String?
+  deviceInfo String?
+  ipAddress  String?
+
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  replacedByTokenId String?
+
+  createdAt DateTime @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  replacedBy RefreshToken? @relation("TokenRotation", fields: [replacedByTokenId], references: [id], onDelete: SetNull)
+
+  replacedTokens RefreshToken[] @relation("TokenRotation")
+
+  sessions LoginSession[]
+
+  @@index([accountId])
+}
+
+model VerificationToken {
+  id        String @id @default(uuid())
+  accountId String
+
+  tokenHash String
+  type      TokenType
+
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+}
+
+model PasswordResetToken {
+  id        String @id @default(uuid())
+  accountId String
+
+  tokenHash String
+
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+}
+
+model TwoFactorAuth {
+  id        String @id @default(uuid())
+  accountId String @unique
+
+  secretEncrypted String
+  method          TwoFactorMethod
+
+  backupCodesHash String?
+  enabledAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model LoginSession {
+  id String @id @default(uuid())
+
+  accountId      String
+  refreshTokenId String
+
+  deviceName String?
+  deviceType String?
+
+  ipAddress String?
+  userAgent String?
+
+  isActive Boolean @default(true)
+
+  lastActiveAt DateTime?
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  refreshToken RefreshToken @relation(fields: [refreshTokenId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([refreshTokenId])
+}
+
+model OAuthAccount {
+  id String @id @default(uuid())
+
+  accountId String
+
+  provider AuthProvider
+
+  providerUserId String
+
+  providerEmail String?
+
+  displayName String?
+  username    String?
+
+  avatarUrl String?
+
+  accessToken  String?
+  refreshToken String?
+
+  linkedAt DateTime @default(now())
+  lastUsedAt DateTime?
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([accountId])
+}
