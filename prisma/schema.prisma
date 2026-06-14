@@ -15,6 +15,7 @@ enum AccountStatus {
 enum TokenType {
   EMAIL
   PHONE
+  REACTIVATION
 }
 
 enum TwoFactorMethod {

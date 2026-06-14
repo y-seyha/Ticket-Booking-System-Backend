@@ -2,13 +2,13 @@ import {
   Injectable,
   Logger,
   BadRequestException,
-  UnauthorizedException,
+  UnauthorizedException, NotFoundException, InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { MailerService } from '../utils/generateEmail';
-import { PasswordResetToken, VerificationToken } from '@prisma/client';
+import {Account, AccountStatus, PasswordResetToken, TokenType, VerificationToken} from '@prisma/client';
 import { CustomerThrottlerStore } from './throttler/customer-throttler.store';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -39,10 +39,6 @@ export class AuthenticationService {
 
   async register(dto: RegisterDto) {
     try {
-      const emailExists = await this.prisma.account.findUnique({
-        where: { email: dto.email },
-      });
-
       const existingAccount = await this.prisma.account.findUnique({
         where: { email: dto.email },
       });
@@ -59,7 +55,7 @@ export class AuthenticationService {
           data: {
             accountId: existingAccount.id,
             tokenHash,
-            type: 'EMAIL',
+            type: TokenType.REACTIVATION,
             expiresAt: new Date(Date.now() + 1000 * 60 * 60),
           },
         });
@@ -73,10 +69,6 @@ export class AuthenticationService {
           message:
             'Account exists but not verified. Verification email resent.',
         };
-      }
-
-      if (emailExists) {
-        throw new BadRequestException('Email already exists');
       }
 
       if (dto.phone) {
@@ -182,6 +174,13 @@ export class AuthenticationService {
 
       if (!account) {
         throw new UnauthorizedException('Invalid email or password');
+      }
+
+      //validate
+      const state = this.getAccountState(account);
+
+      if (!state.allowed) {
+        throw new UnauthorizedException(`Account ${state.type.toLowerCase()}`);
       }
 
       //lock
@@ -298,7 +297,7 @@ export class AuthenticationService {
     const { newPassword, confirmNewPassword } = dto;
 
     if (newPassword !== confirmNewPassword) {
-      throw new BadRequestException('Passwords do not match');
+      throw new BadRequestException('Passwords dto not match');
     }
 
     const tokens = await this.prisma.passwordResetToken.findMany({
@@ -683,6 +682,94 @@ export class AuthenticationService {
     };
   }
 
+  async reactivateAccount(email: string) {
+    const account = await this.prisma.account.findUnique({
+      where: { email },
+    });
+
+    if (!account) {
+      return {
+        message: 'If the account exists, a reactivation email has been sent',
+      };
+    }
+
+    if (account.status !== AccountStatus.DELETED) {
+      throw new BadRequestException(
+          'Only deleted accounts can be reactivated',
+      );
+    }
+
+    const rawToken = crypto.randomUUID();
+    const tokenHash = await bcrypt.hash(rawToken, 10);
+
+    await this.prisma.verificationToken.create({
+      data: {
+        accountId: account.id,
+        tokenHash,
+        type: TokenType.REACTIVATION,
+        expiresAt: new Date(Date.now() + 1000 * 60 * 5), // 5 min
+      },
+    });
+
+    await this.mailerService.sendReactivateAccountEmail(
+        account.email,
+        rawToken,
+    );
+
+    return {
+      message: 'Reactivation email sent',
+    };
+  }
+
+  async confirmReactivation(token: string) {
+    const tokens = await this.prisma.verificationToken.findMany({
+      where: {
+        type: TokenType.REACTIVATION,
+        usedAt: null,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+    });
+
+    let matchedToken: VerificationToken | null = null;
+
+    for (const t of tokens) {
+      const valid = await bcrypt.compare(token, t.tokenHash);
+
+      if (valid) {
+        matchedToken = t;
+        break;
+      }
+    }
+
+    if (!matchedToken) {
+      throw new BadRequestException(
+          'Invalid or expired reactivation token',
+      );
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.account.update({
+        where: { id: matchedToken.accountId },
+        data: {
+          status: AccountStatus.ACTIVE,
+        },
+      }),
+
+      this.prisma.verificationToken.update({
+        where: { id: matchedToken.id },
+        data: {
+          usedAt: new Date(),
+        },
+      }),
+    ]);
+
+    return {
+      message: 'Account reactivated successfully',
+    };
+  }
+
   private handlePrismaError(error: any): never {
     if (error?.code === 'P2002') {
       const target = error.meta?.target;
@@ -725,5 +812,30 @@ export class AuthenticationService {
     if (/mobile/i.test(ua)) return 'MOBILE';
     if (/tablet/i.test(ua)) return 'TABLET';
     return 'DESKTOP';
+  }
+
+  private getAccountState(account: Account) {
+    switch (account.status) {
+      case AccountStatus.SUSPENDED:
+        return {
+          type: 'SUSPENDED',
+          allowed: false,
+          reason: 'Account suspended by admin',
+        };
+
+      case AccountStatus.DELETED:
+        return {
+          type: 'DELETED',
+          allowed: false,
+          reason: 'Account is deleted',
+        };
+
+      default:
+        return {
+          type: 'ACTIVE',
+          allowed: true,
+          reason: null,
+        };
+    }
   }
 }

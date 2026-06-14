@@ -19,6 +19,7 @@ describe('AuthenticationService', () => {
   const mailerMock = {
     sendVerificationEmail: jest.fn(),
     sendResetPasswordEmail: jest.fn(),
+    sendReactivateAccountEmail: jest.fn(),
   };
 
   const prismaMock = {
@@ -43,6 +44,7 @@ describe('AuthenticationService', () => {
     refreshToken: {
       create: jest.fn(),
       findMany: jest.fn(),
+      update: jest.fn(),
     },
     loginSession: {
       create: jest.fn(),
@@ -384,5 +386,180 @@ describe('AuthenticationService', () => {
           }),
       ).toThrow(BadRequestException);
     });
+  });
+
+  describe('reactivateAccount', () => {
+    it('should send reactivation email if account is deleted', async () => {
+      prismaMock.account.findUnique.mockResolvedValue({
+        id: '1',
+        email: 'test@test.com',
+        status: 'DELETED',
+      });
+
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hash');
+      prismaMock.verificationToken.create.mockResolvedValue({});
+      mailerMock.sendReactivateAccountEmail.mockResolvedValue(true);
+
+      const res = await service.reactivateAccount('test@test.com');
+
+      expect(res.message).toContain('Reactivation email sent');
+    });
+
+    it('should throw if account is not deleted', async () => {
+      prismaMock.account.findUnique.mockResolvedValue({
+        id: '1',
+        email: 'test@test.com',
+        status: 'ACTIVE',
+      });
+
+      await expect(
+          service.reactivateAccount('test@test.com'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should return silent response if account not found', async () => {
+      prismaMock.account.findUnique.mockResolvedValue(null);
+
+      const res = await service.reactivateAccount('missing@test.com');
+
+      expect(res.message).toContain('If the account exists');
+    });
+  });
+
+  describe('confirmReactivation', () => {
+    it('should reactivate account successfully', async () => {
+      prismaMock.verificationToken.findMany.mockResolvedValue([
+        {
+          id: 't1',
+          accountId: 'a1',
+          tokenHash: 'hash',
+        },
+      ]);
+
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      prismaMock.$transaction.mockImplementation(async (cb) => cb);
+
+      const res = await service.confirmReactivation('token');
+
+      expect(res.message).toContain('reactivated');
+    });
+
+    it('should fail invalid token', async () => {
+      prismaMock.verificationToken.findMany.mockResolvedValue([]);
+      await expect(service.confirmReactivation('bad')).rejects.toThrow(
+          BadRequestException,
+      );
+    });
+  });
+
+  describe('validateOAuthLogin', () => {
+    it('should return existing oauth account', async () => {
+      prismaMock.oAuthAccount.findUnique.mockResolvedValue({
+        account: { id: '1', email: 'test@test.com' },
+      });
+
+      const res = await service.validateOAuthLogin({
+        provider: 'google',
+        providerUserId: '123',
+        email: 'test@test.com',
+      });
+
+      expect(res.id).toBe('1');
+    });
+
+    it('should create new account if not exists', async () => {
+      prismaMock.oAuthAccount.findUnique.mockResolvedValue(null);
+      prismaMock.account.findUnique.mockResolvedValue(null);
+      prismaMock.account.create.mockResolvedValue({ id: '1' });
+      prismaMock.oAuthAccount.create.mockResolvedValue({});
+
+      const res = await service.validateOAuthLogin({
+        provider: 'google',
+        providerUserId: '123',
+        email: 'test@test.com',
+        displayName: 'John',
+      });
+
+      expect(res.id).toBe('1');
+    });
+
+    it('should throw if email missing', async () => {
+      prismaMock.oAuthAccount.findUnique.mockResolvedValue(null);
+
+      await expect(
+          service.validateOAuthLogin({
+            provider: 'google',
+            providerUserId: '123',
+            email: null,
+          }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('logout', () => {
+    it('should revoke refresh token and clear cookies', async () => {
+      prismaMock.refreshToken.findMany.mockResolvedValue([
+        { id: 'rt1', tokenHash: 'hash' },
+      ]);
+
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      prismaMock.refreshToken.update.mockResolvedValue({});
+      prismaMock.loginSession.updateMany.mockResolvedValue({});
+
+      const res = await service.logout(
+          {
+            user: { sub: 'user1' },
+            cookies: { refresh_token: 'token' },
+          },
+          { clearCookie: jest.fn() } as any,
+      );
+
+      expect(res.message).toBeDefined();
+    });
+  });
+
+  describe('getAccountState', () => {
+    it('should return SUSPENDED state', () => {
+      const res = (service as any).getAccountState({
+        status: 'SUSPENDED',
+      });
+
+      expect(res.allowed).toBe(false);
+    });
+
+    it('should return DELETED state', () => {
+      const res = (service as any).getAccountState({
+        status: 'DELETED',
+      });
+
+      expect(res.allowed).toBe(false);
+    });
+
+    it('should return ACTIVE state', () => {
+      const res = (service as any).getAccountState({
+        status: 'ACTIVE',
+      });
+
+      expect(res.allowed).toBe(true);
+    });
+  });
+
+  it('should ignore expired tokens in confirmReactivation', async () => {
+    prismaMock.verificationToken.findMany.mockResolvedValue([
+      {
+        id: '1',
+        accountId: 'a1',
+        tokenHash: 'hash',
+        expiresAt: new Date(Date.now() - 1000),
+      },
+    ]);
+
+    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+    await expect(
+        service.confirmReactivation('token'),
+    ).rejects.toThrow(BadRequestException);
   });
 });

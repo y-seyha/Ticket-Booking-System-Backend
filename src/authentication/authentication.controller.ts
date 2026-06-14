@@ -7,7 +7,7 @@ import {
   Get,
   Query,
   UseInterceptors,
-  Req,
+  Req, Param,
 } from '@nestjs/common';
 import type { Response } from 'express';
 
@@ -31,6 +31,7 @@ import { CustomerThrottlerGuard } from './guards/customer-throttler.guard';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import {AuthGuard} from "@nestjs/passport";
+import {ReactivateAccountDto} from "./dto/reactivate-account.dto";
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -47,8 +48,6 @@ export class AuthenticationController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.auth.register(dto);
-    this.setCookies(res, result);
-
     return { message: result.message };
   }
 
@@ -75,6 +74,35 @@ export class AuthenticationController {
     return {
       user: result.user,
     };
+  }
+
+  @Post('reactivate')
+  @ApiOperation({ summary: 'Request account reactivation' })
+  async reactivate(
+      @Body() dto: ReactivateAccountDto,
+  ) {
+    return this.auth.reactivateAccount(dto.email);
+  }
+
+  @Get('reactivate/confirm')
+  @ApiQuery({
+    name: 'token',
+    required: true,
+  })
+  async confirmReactivate(
+      @Query('token') token: string,
+      @Res() res: Response,
+  ) {
+    await this.auth.confirmReactivation(token);
+
+    return res.send(`
+    <html>
+      <body style="font-family:Arial;text-align:center;padding:50px;">
+        <h2>Account Reactivated</h2>
+        <p>You can now log in again.</p>
+      </body>
+    </html>
+  `);
   }
 
   @Post('2fa/setup')
