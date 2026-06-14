@@ -129,6 +129,60 @@ export class MailerService {
     );
   }
 
+  async sendReactivateAccountEmail(to: string, token: string) {
+    const baseUrl = process.env.BACKEND_URL!;
+
+    const reactivateUrl = new URL(
+        '/api/v1/auth/reactivate/confirm',
+        baseUrl,
+    );
+
+    reactivateUrl.searchParams.set('token', token);
+
+    const html = this.wrapEmail(
+        'Reactivate Account',
+        `
+      <h2 style="margin:0 0 10px;font-size:18px;font-weight:600;">
+        Reactivate Account
+      </h2>
+
+      <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">
+        Your account has been marked as deleted.
+        Click the button below to restore access.
+      </p>
+
+      <div style="text-align:center;margin:26px 0;">
+        <a href="${reactivateUrl}" style="
+          background:#111827;
+          color:#fff;
+          padding:12px 20px;
+          text-decoration:none;
+          border-radius:6px;
+        ">
+          Reactivate Account
+        </a>
+      </div>
+
+      <p style="font-size:12px;color:#6b7280;text-align:center;">
+        This link expires in 30 minutes.
+      </p>
+    `,
+    );
+
+    await axios.post(
+        this.endpoint,
+        {
+          sender: this.sender,
+          to: [{ email: to }],
+          subject: 'Reactivate Your Account',
+          htmlContent: html,
+        },
+        {
+          headers: this.headers,
+        },
+    );
+  }
+
   private wrapEmail(title: string, content: string) {
     return `
 <!DOCTYPE html>

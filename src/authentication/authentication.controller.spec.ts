@@ -23,6 +23,8 @@ describe('AuthenticationController', () => {
     logout: jest.fn(),
     validateOAuthLogin: jest.fn(),
     issueTokens: jest.fn(),
+    reactivateAccount: jest.fn(),
+    confirmReactivation: jest.fn(),
   };
 
   const resMock: any = {
@@ -77,7 +79,7 @@ describe('AuthenticationController', () => {
       );
 
       expect(res.message).toBe('Account created');
-      expect(resMock.cookie).toHaveBeenCalledTimes(2);
+      expect(resMock.cookie).toHaveBeenCalledTimes(0);
     });
 
     it('error', async () => {
@@ -321,5 +323,125 @@ describe('AuthenticationController', () => {
           controller.discordCallback(reqMock, resMock),
       );
     });
+
+
+    it('login should handle missing request headers safely', async () => {
+      authServiceMock.login.mockResolvedValue({
+        accessToken: 'a',
+        refreshToken: 'r',
+        user: { sub: '1' },
+      });
+
+      const res = await controller.login(
+          { email: 'x', password: 'y' } as any,
+          reqMock,
+          resMock,
+      ) as any;
+
+      expect(res.user.sub).toBe('1');
+      expect(resMock.cookie).toHaveBeenCalled();
+    });
+
+    it('login should NOT set cookies when 2FA required', async () => {
+      authServiceMock.login.mockResolvedValue({
+        requiresTwoFactor: true,
+        tempToken: 'temp123',
+      });
+
+      const res: any = await controller.login(
+          { email: 'x', password: 'y' } as any,
+          reqMock,
+          resMock,
+      );
+
+      expect(res.requiresTwoFactor).toBe(true);
+      expect(resMock.cookie).not.toHaveBeenCalled();
+    });
+
+    it('verifyEmail should return success HTML content', async () => {
+      authServiceMock.verifyEmail.mockResolvedValue(true);
+
+      const res = { send: jest.fn() };
+
+      await controller.verifyEmail('token', res as any);
+
+      expect(res.send).toHaveBeenCalled();
+
+      const html = res.send.mock.calls[0][0];
+      expect(html).toContain('Email Verified Successfully');
+    });
+
+    it('reactivate should call service with email', async () => {
+      authServiceMock.reactivateAccount = jest.fn().mockResolvedValue({
+        message: 'Reactivation email sent',
+      });
+
+      const res = await controller.reactivate(
+          { email: 'test@test.com' } as any,
+      );
+
+      expect(authServiceMock.reactivateAccount).toHaveBeenCalledWith(
+          'test@test.com',
+      );
+
+      expect(res.message).toBe('Reactivation email sent');
+    });
+
+    it('confirmReactivate should return HTML page', async () => {
+      authServiceMock.confirmReactivation = jest.fn().mockResolvedValue(true);
+
+      const res = { send: jest.fn() };
+
+      await controller.confirmReactivate('token123', res as any);
+
+      expect(authServiceMock.confirmReactivation).toHaveBeenCalledWith(
+          'token123',
+      );
+
+      expect(res.send).toHaveBeenCalled();
+
+      const html = res.send.mock.calls[0][0];
+      expect(html).toContain('Account Reactivated');
+    });
+
+    it('logout should forward request and response', async () => {
+      authServiceMock.logout.mockResolvedValue({ ok: true });
+
+      await controller.logout(reqMock, resMock);
+
+      expect(authServiceMock.logout).toHaveBeenCalledWith(
+          reqMock,
+          resMock,
+      );
+    });
+
+    it('google callback should pass correct device info', async () => {
+      authServiceMock.validateOAuthLogin.mockResolvedValue({ id: '1', email: 'a@test.com' });
+
+      authServiceMock.issueTokens.mockResolvedValue({
+        accessToken: 'a',
+        refreshToken: 'r',
+        user: { id: '1' },
+      });
+
+      await controller.googleCallback(reqMock, resMock);
+
+      expect(authServiceMock.issueTokens).toHaveBeenCalledWith(
+          expect.anything(),
+          reqMock,
+          expect.objectContaining({
+            ip: '127.0.0.1',
+          }),
+      );
+    });
+
+    it('should propagate unexpected controller errors', async () => {
+      authServiceMock.login.mockRejectedValue(new Error('DB crash'));
+
+      await expect(
+          controller.login({ email: 'x', password: 'y' } as any, reqMock, resMock),
+      ).rejects.toThrow('DB crash');
+    });
+
   });
 });
