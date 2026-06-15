@@ -299,6 +299,7 @@ model File {
   uploader Account? @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
 
   avatarOfUser UserProfile?
+  theaterOf Theater?
 
   @@index([uploaderId])
 }
@@ -336,6 +337,9 @@ model Theater {
   city     String
 
   status TheaterStatus
+
+  imageId String? @unique
+  image   File?   @relation(fields: [imageId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

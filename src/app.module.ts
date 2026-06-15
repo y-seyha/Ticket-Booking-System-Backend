@@ -7,6 +7,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { FileUploadModule } from './file-upload/file-upload.module';
 import { UserModule } from './user/user.module';
 import { MoviesModule } from './movies/movies.module';
+import { TheaterModule } from './theater/theater.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { MoviesModule } from './movies/movies.module';
     FileUploadModule,
     UserModule,
     MoviesModule,
+    TheaterModule,
   ],
   controllers: [AppController],
   providers: [AppService],
