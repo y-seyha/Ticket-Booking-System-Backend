@@ -13,7 +13,7 @@ export class UpdateProfileDto {
     @IsPhoneNumber()
     phone?: string;
 
-    @IsOptional()
-    @IsString()
-    avatarUrl?: string;
+    // @IsOptional()
+    // @IsString()
+    // avatarUrl?: string;
 }

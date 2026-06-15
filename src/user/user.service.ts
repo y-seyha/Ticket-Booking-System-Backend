@@ -8,12 +8,18 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { AccountStatus, Role, Account, UserProfile } from "@prisma/client";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
+import {UploadFolder} from "../file-upload/dto/upload-file.dto";
+import {FileUploadService} from "../file-upload/file-upload.service";
+import { File } from '@prisma/client';
 
 @Injectable()
 export class UserService {
     private readonly logger = new Logger(UserService.name);
 
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly fileUploadService: FileUploadService,
+    ) {}
 
     async getMyProfile(accountId: string): Promise<Account & { profile: UserProfile | null }> {
         try {
@@ -39,17 +45,59 @@ export class UserService {
         }
     }
 
-    async updateProfile(accountId: string, dto: UpdateProfileDto): Promise<UserProfile> {
+    async updateProfile(accountId: string, dto: UpdateProfileDto, file?: Express.Multer.File,): Promise<UserProfile> {
         try {
             this.logger.log(`Updating profile for accountId=${accountId}`);
 
             const profile = await this.prisma.userProfile.findUnique({
                 where: { accountId },
+                include: { avatar: true },
             });
 
             if (!profile) {
                 this.logger.warn(`Profile not found: ${accountId}`);
-                throw new NotFoundException("Profile not found");
+                throw new NotFoundException('Profile not found');
+            }
+
+            let avatarFile: File | null = null;
+
+            if (file) {
+                this.logger.log(
+                    `Uploading new avatar for accountId=${accountId}`,
+                );
+
+                avatarFile = await this.fileUploadService.uploadFile(
+                    file,
+                    {
+                        folder: UploadFolder.AVATARS,
+                        description: 'User Avatar',
+                    },
+                    accountId,
+                );
+
+                if (profile.avatarId) {
+                    this.logger.log(
+                        `Removing old avatar ${profile.avatarId}`,
+                    );
+
+                    const oldAvatar = await this.prisma.file.findUnique({
+                        where: { id: profile.avatarId },
+                    });
+
+                    if (oldAvatar) {
+                        await this.fileUploadService['cloudinary'].deleteFile(
+                            oldAvatar.publicId,
+                        );
+
+                        await this.prisma.file.delete({
+                            where: { id: oldAvatar.id },
+                        });
+
+                        this.logger.log(
+                            `Old avatar removed successfully`,
+                        );
+                    }
+                }
             }
 
             const updated = await this.prisma.userProfile.update({
@@ -58,11 +106,18 @@ export class UserService {
                     firstName: dto.firstName,
                     lastName: dto.lastName,
                     phone: dto.phone,
-                    avatarUrl: dto.avatarUrl,
+                    ...(avatarFile && {
+                        avatarId: avatarFile.id,
+                    }),
+                },
+                include: {
+                    avatar: true,
                 },
             });
 
-            this.logger.log(`Profile updated successfully: ${accountId}`);
+            this.logger.log(
+                `Profile updated successfully: ${accountId}`,
+            );
 
             return updated;
         } catch (error) {
@@ -71,9 +126,13 @@ export class UserService {
                 (error as Error).stack,
             );
 
-            if (error instanceof NotFoundException) throw error;
+            if (error instanceof NotFoundException) {
+                throw error;
+            }
 
-            throw new InternalServerErrorException("Failed to update profile");
+            throw new InternalServerErrorException(
+                'Failed to update profile',
+            );
         }
     }
 

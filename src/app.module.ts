@@ -6,6 +6,7 @@ import { AuthenticationModule } from './authentication/authentication.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { FileUploadModule } from './file-upload/file-upload.module';
 import { UserModule } from './user/user.module';
+import { MoviesModule } from './movies/movies.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { UserModule } from './user/user.module';
     PrismaModule,
     FileUploadModule,
     UserModule,
+    MoviesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

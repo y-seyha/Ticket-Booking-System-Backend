@@ -6,7 +6,7 @@ import {
     Body,
     UseGuards,
     Query,
-    Delete,
+    Delete, UseInterceptors, UploadedFile,
 } from "@nestjs/common";
 
 import {
@@ -24,6 +24,7 @@ import { Role } from "@prisma/client";
 import { RolesGuard } from "../authentication/guards/roles.guard";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
 import {Roles} from "../authentication/decorators/role.decorator";
+import {FileInterceptor} from "@nestjs/platform-express";
 
 @ApiTags("Users")
 @ApiBearerAuth()
@@ -38,13 +39,18 @@ export class UserController {
         return this.userService.getMyProfile(user.id);
     }
 
-    @Patch("me")
-    @ApiOperation({ summary: "Update current user profile" })
+    @Patch('me')
+    @UseInterceptors(FileInterceptor('avatar'))
     updateMyProfile(
         @CurrentUser() user: any,
         @Body() dto: UpdateProfileDto,
+        @UploadedFile() file?: Express.Multer.File,
     ) {
-        return this.userService.updateProfile(user.id, dto);
+        return this.userService.updateProfile(
+            user.id,
+            dto,
+            file,
+        );
     }
 
     @Delete("me")

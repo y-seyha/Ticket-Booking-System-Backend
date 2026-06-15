@@ -1,0 +1,98 @@
+import {
+    Controller,
+    Get,
+    Post,
+    Body,
+    Patch,
+    Param,
+    Delete,
+    Query,
+    UseGuards, UseInterceptors, UploadedFile,
+} from '@nestjs/common';
+
+import {
+    ApiTags,
+    ApiOperation,
+    ApiBearerAuth,
+    ApiResponse,
+    ApiQuery,
+} from '@nestjs/swagger';
+
+import { MoviesService } from './movies.service';
+import { CreateMovieDto } from './dto/create-movie.dto';
+import { UpdateMovieDto } from './dto/update-movie.dto';
+
+import { Role } from '@prisma/client';
+import {RolesGuard} from "../authentication/guards/roles.guard";
+import {JwtAuthGuard} from "../authentication/guards/jwt-auth.guard";
+import {Roles} from "../authentication/decorators/role.decorator";
+import {MovieQueryDto} from "./dto/ movie-query.dto";
+import { FileInterceptor } from '@nestjs/platform-express';
+import {CurrentUser} from "../authentication/decorators/current-user.decorator";
+import {memoryStorage} from "multer";
+
+@ApiTags('Movies')
+@Controller('movies')
+export class MoviesController {
+    constructor(private readonly moviesService: MoviesService) {}
+
+    @Post()
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Create movie with poster upload' })
+    @UseInterceptors(
+        FileInterceptor('poster', {
+            storage: memoryStorage(),
+        }),
+    )
+    async create(
+        @UploadedFile() file: Express.Multer.File,
+        @Body() dto: CreateMovieDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.moviesService.create(dto, file, user.id);
+    }
+
+    @Get()
+    @ApiOperation({ summary: 'Get all movies with pagination & filters' })
+    @ApiQuery({ name: 'page', required: false, example: 1 })
+    @ApiQuery({ name: 'limit', required: false, example: 10 })
+    @ApiQuery({ name: 'search', required: false })
+    @ApiQuery({ name: 'status', required: false })
+    findAll(@Query() query: MovieQueryDto) {
+        return this.moviesService.findAll(query);
+    }
+
+    @Get(':id')
+    @ApiOperation({ summary: 'Get movie by ID' })
+    @ApiResponse({ status: 200, description: 'Movie found' })
+    @ApiResponse({ status: 404, description: 'Movie not found' })
+    findOne(@Param('id') id: string) {
+        return this.moviesService.findOne(id);
+    }
+
+    @Patch(':id')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @UseInterceptors(FileInterceptor('poster'))
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Update movie (Admin only)' })
+    update(
+        @Param('id') id: string,
+        @UploadedFile() file: Express.Multer.File,
+        @Body() dto: UpdateMovieDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.moviesService.update(id, dto, file, user.id);
+    }
+
+    @Delete(':id')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Delete movie (Admin only)' })
+    remove(@Param('id') id: string,) {
+        return this.moviesService.remove(id);
+    }
+}
