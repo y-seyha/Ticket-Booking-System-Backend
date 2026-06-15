@@ -33,7 +33,7 @@ export class FileUploadService {
                 file,
                 dto.folder || "general",
             );
-
+            this.logger.log(`UploaderId received: ${userId}`);
             const savedFile = await this.prisma.file.create({
                 data: {
                     originalName: file.originalname,
@@ -41,7 +41,7 @@ export class FileUploadService {
                     size: file.size,
                     url: result.secure_url,
                     publicId: result.public_id,
-                    uploaderId: userId,
+                    uploaderId: userId ?? null,
                     description: dto.description,
                 },
             });

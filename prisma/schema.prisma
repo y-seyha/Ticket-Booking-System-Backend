@@ -134,7 +134,10 @@ model UserProfile {
   firstName String
   lastName  String
   phone     String?           @unique
-  avatarUrl String?
+
+  avatarId String? @unique
+  avatar   File?   @relation(fields: [avatarId], references: [id])
+
   status    UserProfileStatus
 
   createdAt DateTime @default(now())
@@ -287,12 +290,15 @@ model File {
 
   description String?
 
-  uploaderId String?
+  uploaderId    String?
+  posterOfMovie Movie?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   uploader Account? @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+
+  avatarOfUser UserProfile?
 
   @@index([uploaderId])
 }
@@ -304,13 +310,13 @@ model Movie {
   description String?
 
   durationMinutes Int
+  language        String
+  releaseDate     DateTime
 
-  language String
+  posterId String? @unique
+  poster   File?   @relation(fields: [posterId], references: [id])
 
-  releaseDate DateTime
-
-  posterUrl  String?
-  trailerUrl String?
+  trailerYoutubeId String?
 
   status MovieStatus
 
@@ -324,6 +330,8 @@ model Theater {
   id String @id @default(uuid())
 
   name     String
+  phone    String?
+  email    String?
   location String
   city     String
 

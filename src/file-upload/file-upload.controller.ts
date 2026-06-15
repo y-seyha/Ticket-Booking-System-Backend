@@ -15,6 +15,7 @@ import { UploadFileDto } from "./dto/upload-file.dto";
 
 import { JwtAuthGuard } from "../authentication/guards/jwt-auth.guard";
 import { CurrentUser } from "../authentication/decorators/current-user.decorator";
+import { memoryStorage } from "multer";
 
 import {
     ApiBearerAuth,
@@ -33,7 +34,11 @@ export class FileUploadController {
     constructor(private readonly fileService: FileUploadService) {}
 
     @Post("upload")
-    @UseInterceptors(FileInterceptor("file"))
+    @UseInterceptors(
+        FileInterceptor("file", {
+            storage: memoryStorage(),
+        }),
+    )
     @ApiOperation({ summary: "Upload a file (Cloudinary)" })
     @ApiConsumes("multipart/form-data")
     @ApiBody({

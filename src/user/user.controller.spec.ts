@@ -48,6 +48,16 @@ describe('UserController', () => {
       expect(userServiceMock.getMyProfile).toHaveBeenCalledWith('user-1');
       expect(res.id).toBe('user-1');
     });
+
+    it('should propagate service error', async () => {
+      userServiceMock.getMyProfile.mockRejectedValue(
+          new Error('profile fail'),
+      );
+
+      await expect(
+          controller.getMyProfile(mockUser),
+      ).rejects.toThrow('profile fail');
+    });
   });
 
   describe('PATCH /users/me', () => {
@@ -56,16 +66,58 @@ describe('UserController', () => {
         firstName: 'John',
       });
 
-      const res = await controller.updateMyProfile(mockUser, {
-        firstName: 'John',
-      } as any);
+      const res = await controller.updateMyProfile(
+          mockUser,
+          { firstName: 'John' } as any,
+          undefined,
+      );
 
       expect(userServiceMock.updateProfile).toHaveBeenCalledWith(
           'user-1',
-          expect.any(Object),
+          { firstName: 'John' },
+          undefined,
       );
 
       expect(res.firstName).toBe('John');
+    });
+
+    it('should update profile with avatar', async () => {
+      const mockFile = {
+        originalname: 'avatar.png',
+        mimetype: 'image/png',
+        filename: 'avatar.png',
+      } as Express.Multer.File;
+
+      userServiceMock.updateProfile.mockResolvedValue({
+        firstName: 'John',
+        avatarId: 'file-123',
+      });
+
+      const res = await controller.updateMyProfile(
+          mockUser,
+          { firstName: 'John' } as any,
+          mockFile,
+      );
+
+      expect(userServiceMock.updateProfile).toHaveBeenCalledWith(
+          'user-1',
+          { firstName: 'John' },
+          mockFile,
+      );
+
+      expect(res.avatarId).toBe('file-123');
+    });
+
+    describe('PATCH /users/:id/role', () => {
+      it('should propagate invalid role error', async () => {
+        userServiceMock.changeRole.mockRejectedValue(
+            new Error('Invalid role'),
+        );
+
+        await expect(
+            controller.changeRole('3', 'INVALID' as any, mockUser),
+        ).rejects.toThrow('Invalid role');
+      });
     });
   });
 
@@ -92,6 +144,17 @@ describe('UserController', () => {
 
       expect(userServiceMock.getAllUsers).toHaveBeenCalledWith(1, 10);
       expect(res.length).toBe(1);
+    });
+
+    it('should convert query params to numbers', async () => {
+      userServiceMock.getAllUsers.mockResolvedValue([]);
+
+      await controller.getAllUsers('10' as any, '20' as any);
+
+      expect(userServiceMock.getAllUsers).toHaveBeenCalledWith(
+          10,
+          20,
+      );
     });
 
     it('should parse pagination strings', async () => {
