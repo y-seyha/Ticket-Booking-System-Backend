@@ -61,8 +61,10 @@ enum ScreenType {
 }
 
 enum SeatType {
-  NORMAL
+  STANDARD
   VIP
+  COUPLE
+  WHEELCHAIR
 }
 
 enum SeatStatus {
@@ -102,22 +104,16 @@ model Account {
   passwordHash String?
   role         Role          @default(USER)
   status       AccountStatus @default(ACTIVE)
-
   emailVerified    Boolean @default(false)
   phoneVerified    Boolean @default(false)
   twoFactorEnabled Boolean @default(false)
-
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
   lastLoginAt         DateTime?
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   profile UserProfile?
-
   oauthAccounts OAuthAccount[]
-
   refreshTokens       RefreshToken[]
   verificationTokens  VerificationToken[]
   passwordResetTokens PasswordResetToken[]
@@ -125,85 +121,61 @@ model Account {
   loginSessions       LoginSession[]
   uploadedFiles       File[]
   bookings            Booking[]
+  seatLocks SeatLock[]
 }
 
 model UserProfile {
   id        String @id @default(uuid())
   accountId String @unique
-
   firstName String
   lastName  String
-  phone     String?           @unique
-
+  phone     String? @unique
   avatarId String? @unique
   avatar   File?   @relation(fields: [avatarId], references: [id])
-
-  status    UserProfileStatus
-
+  status UserProfileStatus
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }
 
 model RefreshToken {
   id        String @id @default(uuid())
   accountId String
-
   tokenHash String
-
   deviceId   String?
   deviceInfo String?
   ipAddress  String?
-
   expiresAt DateTime
   revokedAt DateTime?
-
   replacedByTokenId String?
-
   createdAt DateTime @default(now())
-
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
   replacedBy RefreshToken? @relation("TokenRotation", fields: [replacedByTokenId], references: [id], onDelete: SetNull)
-
   replacedTokens RefreshToken[] @relation("TokenRotation")
-
   sessions LoginSession[]
-
   @@index([accountId])
 }
 
 model VerificationToken {
   id        String @id @default(uuid())
   accountId String
-
   tokenHash String
   type      TokenType
-
   expiresAt DateTime
   usedAt    DateTime?
-
   createdAt DateTime @default(now())
-
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
   @@index([accountId])
 }
 
 model PasswordResetToken {
   id        String @id @default(uuid())
   accountId String
-
   tokenHash String
-
   expiresAt DateTime
   usedAt    DateTime?
-
   createdAt DateTime @default(now())
-
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
   @@index([accountId])
 }
 
@@ -252,26 +224,17 @@ model LoginSession {
 
 model OAuthAccount {
   id String @id @default(uuid())
-
   accountId String
-
   provider AuthProvider
-
   providerUserId String
-
   providerEmail String?
-
   displayName String?
   username    String?
-
   avatarUrl String?
-
   accessToken  String?
   refreshToken String?
-
   linkedAt   DateTime  @default(now())
   lastUsedAt DateTime?
-
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerUserId])
@@ -280,45 +243,34 @@ model OAuthAccount {
 
 model File {
   id String @id @default(uuid())
-
   originalName String
   mimeType     String
   size         Int
-
   url      String
   publicId String @unique
-
   description String?
-
   uploaderId    String?
   posterOfMovie Movie?
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   uploader Account? @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
 
   avatarOfUser UserProfile?
-  theaterOf Theater?
+  theaterOf    Theater?
 
   @@index([uploaderId])
 }
 
 model Movie {
   id String @id @default(uuid())
-
   title       String
   description String?
-
   durationMinutes Int
   language        String
   releaseDate     DateTime
-
   posterId String? @unique
   poster   File?   @relation(fields: [posterId], references: [id])
-
   trailerYoutubeId String?
-
   status MovieStatus
 
   createdAt DateTime @default(now())
@@ -329,15 +281,12 @@ model Movie {
 
 model Theater {
   id String @id @default(uuid())
-
   name     String
   phone    String?
   email    String?
   location String
   city     String
-
   status TheaterStatus
-
   imageId String? @unique
   image   File?   @relation(fields: [imageId], references: [id])
 
@@ -349,41 +298,79 @@ model Theater {
 
 model Screen {
   id String @id @default(uuid())
-
-  theaterId String
-
-  name String
-  type ScreenType
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  theater Theater @relation(fields: [theaterId], references: [id], onDelete: Cascade)
-
-  seats Seat[]
-
-  showtimes Showtime[]
+  theaterId  String
+  templateId String
+  name       String
+  type       ScreenType
+  theater    Theater        @relation(fields: [theaterId], references: [id], onDelete: Cascade)
+  template   ScreenTemplate @relation(fields: [templateId], references: [id])
+  seats      Seat[]
+  showtimes  Showtime[]
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
 }
 
-model Seat {
+model ScreenTemplate {
+  id            String               @id @default(uuid())
+  name          String
+  type          ScreenType
+  description   String?
+  isActive      Boolean              @default(true)
+  screens       Screen[]
+  templateSeats ScreenTemplateSeat[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+}
+
+model ScreenTemplateSeat {
   id String @id @default(uuid())
 
-  screenId String
+  templateId String
 
   seatRow    String
   seatNumber Int
 
+  posX Int
+  posY Int
+
   seatType SeatType
-  status   SeatStatus
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  template ScreenTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+}
 
-  screen Screen @relation(fields: [screenId], references: [id], onDelete: Cascade)
-
+model Seat {
+  id           String        @id @default(uuid())
+  screenId     String
+  seatRow      String
+  seatNumber   Int
+  posX         Int
+  posY         Int
+  seatType     SeatType
+  status       SeatStatus
+  screen   Screen @relation(fields: [screenId], references: [id], onDelete: Cascade)
   bookingSeats BookingSeat[]
+  seatLocks SeatLock[]
 
   @@unique([screenId, seatRow, seatNumber])
+}
+
+model SeatLock {
+  id         String   @id @default(uuid())
+
+  accountId  String
+  seatId     String
+  showtimeId String
+
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  seat    Seat    @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  showtime Showtime @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
+
+  @@unique([showtimeId, seatId])
+  @@index([accountId])
+  @@index([expiresAt])
 }
 
 model Showtime {
@@ -409,6 +396,7 @@ model Showtime {
   bookings Booking[]
 
   bookingSeats BookingSeat[]
+  seatLocks SeatLock[]
 
   @@index([movieId])
   @@index([screenId])
