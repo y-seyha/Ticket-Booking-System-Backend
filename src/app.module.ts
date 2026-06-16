@@ -8,6 +8,10 @@ import { FileUploadModule } from './file-upload/file-upload.module';
 import { UserModule } from './user/user.module';
 import { MoviesModule } from './movies/movies.module';
 import { TheaterModule } from './theater/theater.module';
+import { ScreenModule } from './screen/screen.module';
+import { ScreenTemplateModule } from './screen-template/screen-template.module';
+import { SeatTemplateModule } from './seat-template/seat-template.module';
+import { SeatModule } from './seat/seat.module';
 
 @Module({
   imports: [
@@ -20,6 +24,10 @@ import { TheaterModule } from './theater/theater.module';
     UserModule,
     MoviesModule,
     TheaterModule,
+    ScreenModule,
+    ScreenTemplateModule,
+    SeatTemplateModule,
+    SeatModule,
   ],
   controllers: [AppController],
   providers: [AppService],
