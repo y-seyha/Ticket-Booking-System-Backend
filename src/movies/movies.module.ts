@@ -5,10 +5,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { FileUploadModule } from '../file-upload/file-upload.module';
 
 @Module({
-  imports: [
-    PrismaModule,
-    FileUploadModule,
-  ],
+  imports: [PrismaModule, FileUploadModule],
   controllers: [MoviesController],
   providers: [MoviesService],
 })

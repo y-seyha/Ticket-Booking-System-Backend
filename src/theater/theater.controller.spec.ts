@@ -28,9 +28,7 @@ describe('TheaterController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TheaterController],
-      providers: [
-        { provide: TheaterService, useValue: theaterService },
-      ],
+      providers: [{ provide: TheaterService, useValue: theaterService }],
     }).compile();
 
     controller = module.get(TheaterController);
@@ -45,9 +43,9 @@ describe('TheaterController', () => {
       const result = await controller.create(mockFile, dto, mockUser);
 
       expect(theaterService.create).toHaveBeenCalledWith(
-          dto,
-          mockFile,
-          mockUser.id,
+        dto,
+        mockFile,
+        mockUser.id,
       );
 
       expect(result).toEqual({ id: '1' });
@@ -61,9 +59,9 @@ describe('TheaterController', () => {
       const result = await controller.create(undefined as any, dto, mockUser);
 
       expect(theaterService.create).toHaveBeenCalledWith(
-          dto,
-          undefined,
-          mockUser.id,
+        dto,
+        undefined,
+        mockUser.id,
       );
 
       expect(result.id).toBe('1');
@@ -76,7 +74,7 @@ describe('TheaterController', () => {
 
       theaterService.findAll.mockResolvedValue({ data: [], pagination: {} });
 
-      await controller.findAll(query as any);
+      await controller.findAll(query);
 
       expect(theaterService.findAll).toHaveBeenCalledWith(query);
     });
@@ -89,7 +87,7 @@ describe('TheaterController', () => {
 
       theaterService.findAll.mockResolvedValue(response);
 
-      const result = await controller.findAll({} as any);
+      const result = await controller.findAll({});
 
       expect(result).toEqual(response);
     });
@@ -112,18 +110,13 @@ describe('TheaterController', () => {
 
       const dto = { name: 'Updated' } as any;
 
-      const result = await controller.update(
-          '1',
-          dto,
-          mockFile,
-          mockUser,
-      );
+      const result = await controller.update('1', dto, mockFile, mockUser);
 
       expect(theaterService.update).toHaveBeenCalledWith(
-          '1',
-          dto,
-          mockFile,
-          mockUser.id,
+        '1',
+        dto,
+        mockFile,
+        mockUser.id,
       );
 
       expect(result.id).toBe('1');
@@ -137,10 +130,10 @@ describe('TheaterController', () => {
       await controller.update('1', dto, undefined as any, mockUser);
 
       expect(theaterService.update).toHaveBeenCalledWith(
-          '1',
-          dto,
-          undefined,
-          mockUser.id,
+        '1',
+        dto,
+        undefined,
+        mockUser.id,
       );
     });
   });

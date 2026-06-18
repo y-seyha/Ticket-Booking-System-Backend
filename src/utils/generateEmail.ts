@@ -132,16 +132,13 @@ export class MailerService {
   async sendReactivateAccountEmail(to: string, token: string) {
     const baseUrl = process.env.BACKEND_URL!;
 
-    const reactivateUrl = new URL(
-        '/api/v1/auth/reactivate/confirm',
-        baseUrl,
-    );
+    const reactivateUrl = new URL('/api/v1/auth/reactivate/confirm', baseUrl);
 
     reactivateUrl.searchParams.set('token', token);
 
     const html = this.wrapEmail(
-        'Reactivate Account',
-        `
+      'Reactivate Account',
+      `
       <h2 style="margin:0 0 10px;font-size:18px;font-weight:600;">
         Reactivate Account
       </h2>
@@ -170,16 +167,16 @@ export class MailerService {
     );
 
     await axios.post(
-        this.endpoint,
-        {
-          sender: this.sender,
-          to: [{ email: to }],
-          subject: 'Reactivate Your Account',
-          htmlContent: html,
-        },
-        {
-          headers: this.headers,
-        },
+      this.endpoint,
+      {
+        sender: this.sender,
+        to: [{ email: to }],
+        subject: 'Reactivate Your Account',
+        htmlContent: html,
+      },
+      {
+        headers: this.headers,
+      },
     );
   }
 

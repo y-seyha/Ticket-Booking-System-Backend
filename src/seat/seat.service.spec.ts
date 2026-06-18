@@ -45,7 +45,6 @@ describe('SeatService', () => {
     (service as any).logger = mockLogger;
   });
 
-
   describe('getSeatsByScreen', () => {
     it('should return seats sorted', async () => {
       const data = [{ id: '1' }];
@@ -56,10 +55,7 @@ describe('SeatService', () => {
       expect(result).toEqual(data);
       expect(mockPrisma.seat.findMany).toHaveBeenCalledWith({
         where: { screenId: 's1' },
-        orderBy: [
-          { seatRow: 'asc' },
-          { seatNumber: 'asc' },
-        ],
+        orderBy: [{ seatRow: 'asc' }, { seatNumber: 'asc' }],
       });
     });
 
@@ -67,7 +63,7 @@ describe('SeatService', () => {
       mockPrisma.seat.findMany.mockRejectedValue(new Error('DB fail'));
 
       await expect(service.getSeatsByScreen('s1')).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
 
       expect(mockLogger.error).toHaveBeenCalled();
@@ -77,7 +73,7 @@ describe('SeatService', () => {
       mockPrisma.seat.findMany.mockRejectedValue(undefined);
 
       await expect(service.getSeatsByScreen('s1')).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
@@ -89,10 +85,7 @@ describe('SeatService', () => {
       mockPrisma.showtime.findUnique.mockResolvedValue({
         id: 'st1',
         screen: {
-          seats: [
-            { id: 's1' },
-            { id: 's2' },
-          ],
+          seats: [{ id: 's1' }, { id: 's2' }],
         },
         seatLocks: [
           {
@@ -100,9 +93,7 @@ describe('SeatService', () => {
             expiresAt: new Date(now.getTime() + 100000),
           },
         ],
-        bookingSeats: [
-          { seatId: 's2' },
-        ],
+        bookingSeats: [{ seatId: 's2' }],
       });
 
       const result = await service.getSeatMap('st1');
@@ -138,21 +129,18 @@ describe('SeatService', () => {
       mockPrisma.showtime.findUnique.mockResolvedValue(null);
 
       await expect(service.getSeatMap('st1')).rejects.toThrow(
-          NotFoundException,
+        NotFoundException,
       );
     });
 
     it('should handle prisma crash', async () => {
-      mockPrisma.showtime.findUnique.mockRejectedValue(
-          new Error('DB crash'),
-      );
+      mockPrisma.showtime.findUnique.mockRejectedValue(new Error('DB crash'));
 
       await expect(service.getSeatMap('st1')).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
-
 
   describe('lockSeat', () => {
     const dto = {
@@ -170,7 +158,7 @@ describe('SeatService', () => {
         id: 'lock1',
       });
 
-      const result = await service.lockSeat('acc1', dto as any);
+      const result = await service.lockSeat('acc1', dto);
 
       expect(result.message).toBe('Seat locked successfully');
       expect(mockPrisma.seatLock.create).toHaveBeenCalled();
@@ -180,7 +168,7 @@ describe('SeatService', () => {
       mockPrisma.seat.findUnique.mockResolvedValue(null);
 
       await expect(service.lockSeat('acc1', dto as any)).rejects.toThrow(
-          NotFoundException,
+        NotFoundException,
       );
     });
 
@@ -189,7 +177,7 @@ describe('SeatService', () => {
       mockPrisma.showtime.findUnique.mockResolvedValue(null);
 
       await expect(service.lockSeat('acc1', dto as any)).rejects.toThrow(
-          NotFoundException,
+        NotFoundException,
       );
     });
 
@@ -202,7 +190,7 @@ describe('SeatService', () => {
       });
 
       await expect(service.lockSeat('acc1', dto as any)).rejects.toThrow(
-          BadRequestException,
+        BadRequestException,
       );
     });
 
@@ -216,7 +204,7 @@ describe('SeatService', () => {
 
       mockPrisma.seatLock.create.mockResolvedValue({ id: 'lock2' });
 
-      const result = await service.lockSeat('acc1', dto as any);
+      const result = await service.lockSeat('acc1', dto);
 
       expect(result.message).toBe('Seat locked successfully');
     });
@@ -225,11 +213,10 @@ describe('SeatService', () => {
       mockPrisma.seat.findUnique.mockRejectedValue(new Error('DB fail'));
 
       await expect(service.lockSeat('acc1', dto as any)).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
-
 
   describe('unlockSeat', () => {
     it('should unlock seat successfully', async () => {
@@ -248,9 +235,9 @@ describe('SeatService', () => {
     it('should throw NotFoundException if lock missing', async () => {
       mockPrisma.seatLock.findUnique.mockResolvedValue(null);
 
-      await expect(
-          service.unlockSeat('acc1', 's1', 'st1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.unlockSeat('acc1', 's1', 'st1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BadRequestException if not owner', async () => {
@@ -259,22 +246,19 @@ describe('SeatService', () => {
         accountId: 'other-user',
       });
 
-      await expect(
-          service.unlockSeat('acc1', 's1', 'st1'),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.unlockSeat('acc1', 's1', 'st1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should handle prisma crash', async () => {
-      mockPrisma.seatLock.findUnique.mockRejectedValue(
-          new Error('DB fail'),
-      );
+      mockPrisma.seatLock.findUnique.mockRejectedValue(new Error('DB fail'));
 
-      await expect(
-          service.unlockSeat('acc1', 's1', 'st1'),
-      ).rejects.toThrow(InternalServerErrorException);
+      await expect(service.unlockSeat('acc1', 's1', 'st1')).rejects.toThrow(
+        InternalServerErrorException,
+      );
     });
   });
-
 
   describe('cleanupExpiredLocks', () => {
     it('should delete expired locks and log count', async () => {
@@ -284,7 +268,7 @@ describe('SeatService', () => {
 
       expect(result.count).toBe(5);
       expect(mockLogger.log).toHaveBeenCalledWith(
-          expect.stringContaining('Cleaned 5'),
+        expect.stringContaining('Cleaned 5'),
       );
     });
 
@@ -292,7 +276,7 @@ describe('SeatService', () => {
       mockPrisma.seatLock.deleteMany.mockRejectedValue(new Error('fail'));
 
       await expect(service.cleanupExpiredLocks()).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
 
       expect(mockLogger.error).toHaveBeenCalled();

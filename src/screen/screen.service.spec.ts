@@ -64,7 +64,6 @@ describe('ScreenService', () => {
       jest.clearAllMocks();
     });
 
-
     it('should create screen and generate seats successfully', async () => {
       mockPrisma.theater.findUnique.mockResolvedValue({ id: 't1' });
 
@@ -119,14 +118,13 @@ describe('ScreenService', () => {
       expect(mockSeatCreateMany).toHaveBeenCalledTimes(1);
 
       expect(mockLogger.log).toHaveBeenCalledWith(
-          expect.stringContaining('Creating screen'),
+        expect.stringContaining('Creating screen'),
       );
 
       expect(mockLogger.log).toHaveBeenCalledWith(
-          expect.stringContaining('Screen created'),
+        expect.stringContaining('Screen created'),
       );
     });
-
 
     it('should throw InternalServerErrorException if screen.create fails', async () => {
       mockPrisma.theater.findUnique.mockResolvedValue({ id: 't1' });
@@ -157,7 +155,7 @@ describe('ScreenService', () => {
       });
 
       await expect(service.create(dto)).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
 
       expect(mockLogger.error).toHaveBeenCalled();
@@ -181,9 +179,9 @@ describe('ScreenService', () => {
       });
 
       const mockScreenCreate = jest.fn().mockResolvedValue({ id: 'screen1' });
-      const mockSeatCreateMany = jest.fn().mockRejectedValue(
-          new Error('seat insert failed'),
-      );
+      const mockSeatCreateMany = jest
+        .fn()
+        .mockRejectedValue(new Error('seat insert failed'));
 
       mockPrisma.$transaction.mockImplementation(async (cb) => {
         return cb({
@@ -197,10 +195,9 @@ describe('ScreenService', () => {
       });
 
       await expect(service.create(dto)).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
-
 
     it('should throw BadRequestException when templateSeats is undefined', async () => {
       mockPrisma.theater.findUnique.mockResolvedValue({ id: 't1' });
@@ -222,9 +219,7 @@ describe('ScreenService', () => {
         });
       });
 
-      await expect(service.create(dto)).rejects.toThrow(
-          BadRequestException,
-      );
+      await expect(service.create(dto)).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException when templateSeats is null', async () => {
@@ -247,11 +242,8 @@ describe('ScreenService', () => {
         });
       });
 
-      await expect(service.create(dto)).rejects.toThrow(
-          BadRequestException,
-      );
+      await expect(service.create(dto)).rejects.toThrow(BadRequestException);
     });
-
 
     it('should correctly transform templateSeats into SeatCreateManyInput', async () => {
       mockPrisma.theater.findUnique.mockResolvedValue({ id: 't1' });
@@ -302,7 +294,6 @@ describe('ScreenService', () => {
       });
     });
 
-
     it('should log creation flow correctly', async () => {
       mockPrisma.theater.findUnique.mockResolvedValue({ id: 't1' });
 
@@ -334,15 +325,14 @@ describe('ScreenService', () => {
       await service.create(dto);
 
       expect(mockLogger.log).toHaveBeenCalledWith(
-          expect.stringContaining('Creating screen for theater'),
+        expect.stringContaining('Creating screen for theater'),
       );
 
       expect(mockLogger.log).toHaveBeenCalledWith(
-          expect.stringContaining('Screen created:'),
+        expect.stringContaining('Screen created:'),
       );
     });
   });
-
 
   describe('findAll', () => {
     it('should return screens with relations', async () => {
@@ -399,7 +389,7 @@ describe('ScreenService', () => {
       mockPrisma.screen.findMany.mockRejectedValue(new Error('DB crashed'));
 
       await expect(service.findAll()).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
 
       expect(mockLogger.error).toHaveBeenCalled();
@@ -409,11 +399,10 @@ describe('ScreenService', () => {
       mockPrisma.screen.findMany.mockRejectedValue(undefined);
 
       await expect(service.findAll()).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
-
 
   describe('findOne', () => {
     it('should return screen with relations', async () => {
@@ -443,9 +432,7 @@ describe('ScreenService', () => {
     it('should throw NotFoundException when screen does not exist', async () => {
       mockPrisma.screen.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOne('1')).rejects.toThrow(
-          NotFoundException,
-      );
+      await expect(service.findOne('1')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw NotFoundException with correct message', async () => {
@@ -462,22 +449,20 @@ describe('ScreenService', () => {
     it('should handle empty string id safely', async () => {
       mockPrisma.screen.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOne('')).rejects.toThrow(
-          NotFoundException,
-      );
+      await expect(service.findOne('')).rejects.toThrow(NotFoundException);
     });
 
     it('should handle undefined id safely', async () => {
       mockPrisma.screen.findUnique.mockResolvedValue(null);
 
       await expect(service.findOne(undefined as any)).rejects.toThrow(
-          NotFoundException,
+        NotFoundException,
       );
     });
 
     it('should handle Prisma unexpected error', async () => {
       mockPrisma.screen.findUnique.mockRejectedValue(
-          new Error('Connection lost'),
+        new Error('Connection lost'),
       );
 
       await expect(service.findOne('1')).rejects.toThrow();
@@ -506,11 +491,11 @@ describe('ScreenService', () => {
       mockPrisma.screenTemplate.findUnique.mockResolvedValue(null);
 
       await expect(
-          service.update('1', { templateId: 'bad' } as any),
+        service.update('1', { templateId: 'bad' } as any),
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw BadRequestException on type mismatch', async () => {
+    it('should throw BadRequestException on types mismatch', async () => {
       jest.spyOn(service, 'findOne').mockResolvedValue({ id: '1' } as any);
 
       mockPrisma.screenTemplate.findUnique.mockResolvedValue({
@@ -519,10 +504,10 @@ describe('ScreenService', () => {
       });
 
       await expect(
-          service.update('1', {
-            templateId: 'tpl',
-            type: 'STANDARD',
-          } as any),
+        service.update('1', {
+          templateId: 'tpl',
+          type: 'STANDARD',
+        } as any),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -530,11 +515,10 @@ describe('ScreenService', () => {
       jest.spyOn(service, 'findOne').mockRejectedValue(new Error());
 
       await expect(service.update('1', dto)).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
-
 
   describe('remove', () => {
     it('should delete screen', async () => {
@@ -548,13 +532,9 @@ describe('ScreenService', () => {
     });
 
     it('should throw NotFoundException', async () => {
-      jest.spyOn(service, 'findOne').mockRejectedValue(
-          new NotFoundException(),
-      );
+      jest.spyOn(service, 'findOne').mockRejectedValue(new NotFoundException());
 
-      await expect(service.remove('1')).rejects.toThrow(
-          NotFoundException,
-      );
+      await expect(service.remove('1')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw InternalServerErrorException', async () => {
@@ -562,7 +542,7 @@ describe('ScreenService', () => {
       mockPrisma.screen.delete.mockRejectedValue(new Error());
 
       await expect(service.remove('1')).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });

@@ -25,15 +25,13 @@ describe('MoviesController', () => {
   beforeEach(async () => {
     const module = await Test.createTestingModule({
       controllers: [MoviesController],
-      providers: [
-        { provide: MoviesService, useValue: moviesServiceMock },
-      ],
+      providers: [{ provide: MoviesService, useValue: moviesServiceMock }],
     })
-        .overrideGuard(JwtAuthGuard)
-        .useValue(mockGuard)
-        .overrideGuard(RolesGuard)
-        .useValue(mockGuard)
-        .compile();
+      .overrideGuard(JwtAuthGuard)
+      .useValue(mockGuard)
+      .overrideGuard(RolesGuard)
+      .useValue(mockGuard)
+      .compile();
 
     controller = module.get(MoviesController);
 
@@ -45,9 +43,9 @@ describe('MoviesController', () => {
       moviesServiceMock.create.mockResolvedValue({ id: '1' });
 
       const res = await controller.create(
-          { originalname: 'file.png' } as any,
-          { title: 'Movie' } as any,
-          { id: 'user1' },
+        { originalname: 'file.png' } as any,
+        { title: 'Movie' } as any,
+        { id: 'user1' },
       );
 
       expect(moviesServiceMock.create).toHaveBeenCalled();
@@ -58,9 +56,9 @@ describe('MoviesController', () => {
       moviesServiceMock.create.mockResolvedValue({ id: '1' });
 
       const res = await controller.create(
-          undefined as any,
-          { title: 'Movie' } as any,
-          { id: 'user1' },
+        undefined as any,
+        { title: 'Movie' } as any,
+        { id: 'user1' },
       );
 
       expect(res.id).toBe('1');
@@ -70,7 +68,7 @@ describe('MoviesController', () => {
       moviesServiceMock.create.mockRejectedValue(new Error('fail'));
 
       await expect(
-          controller.create(undefined as any, {} as any, { id: 'u1' }),
+        controller.create(undefined as any, {} as any, { id: 'u1' }),
       ).rejects.toThrow('fail');
     });
   });
@@ -82,7 +80,7 @@ describe('MoviesController', () => {
         pagination: {},
       });
 
-      const res = await controller.findAll({ page: 1, limit: 10 } as any);
+      const res = await controller.findAll({ page: 1, limit: 10 });
 
       expect(res.data.length).toBe(1);
     });
@@ -98,19 +96,17 @@ describe('MoviesController', () => {
       } as any);
 
       expect(moviesServiceMock.findAll).toHaveBeenCalledWith(
-          expect.objectContaining({
-            page: 2,
-            limit: 5,
-          }),
+        expect.objectContaining({
+          page: 2,
+          limit: 5,
+        }),
       );
     });
 
     it('should handle service error', async () => {
       moviesServiceMock.findAll.mockRejectedValue(new Error('db fail'));
 
-      await expect(controller.findAll({} as any)).rejects.toThrow(
-          'db fail',
-      );
+      await expect(controller.findAll({} as any)).rejects.toThrow('db fail');
     });
   });
 
@@ -124,13 +120,9 @@ describe('MoviesController', () => {
     });
 
     it('should propagate not found', async () => {
-      moviesServiceMock.findOne.mockRejectedValue(
-          new Error('Movie not found'),
-      );
+      moviesServiceMock.findOne.mockRejectedValue(new Error('Movie not found'));
 
-      await expect(controller.findOne('1')).rejects.toThrow(
-          'Movie not found',
-      );
+      await expect(controller.findOne('1')).rejects.toThrow('Movie not found');
     });
   });
 
@@ -139,10 +131,10 @@ describe('MoviesController', () => {
       moviesServiceMock.update.mockResolvedValue({ id: '1' });
 
       const res = await controller.update(
-          '1',
-          { originalname: 'file.png' } as any,
-          { title: 'new' } as any,
-          { id: 'user1' },
+        '1',
+        { originalname: 'file.png' } as any,
+        { title: 'new' },
+        { id: 'user1' },
       );
 
       expect(res.id).toBe('1');
@@ -152,10 +144,10 @@ describe('MoviesController', () => {
       moviesServiceMock.update.mockResolvedValue({ id: '1' });
 
       const res = await controller.update(
-          '1',
-          undefined as any,
-          { title: 'new' } as any,
-          { id: 'user1' },
+        '1',
+        undefined as any,
+        { title: 'new' },
+        { id: 'user1' },
       );
 
       expect(res.id).toBe('1');
@@ -165,7 +157,7 @@ describe('MoviesController', () => {
       moviesServiceMock.update.mockRejectedValue(new Error('fail'));
 
       await expect(
-          controller.update('1', undefined as any, {} as any, { id: 'u1' }),
+        controller.update('1', undefined as any, {} as any, { id: 'u1' }),
       ).rejects.toThrow('fail');
     });
   });

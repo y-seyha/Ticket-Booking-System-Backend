@@ -3,7 +3,11 @@ import { ScreenController } from './screen.controller';
 import { ScreenService } from './screen.service';
 import { CreateScreenDto } from './dto/create-screen.dto';
 import { UpdateScreenDto } from './dto/update-screen.dto';
-import { NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import {
+  NotFoundException,
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 
 describe('ScreenController', () => {
   let controller: ScreenController;
@@ -54,23 +58,21 @@ describe('ScreenController', () => {
       const dto = {} as CreateScreenDto;
 
       mockScreenService.create.mockRejectedValue(
-          new BadRequestException('Invalid screen data'),
+        new BadRequestException('Invalid screen data'),
       );
 
-      await expect(controller.create(dto)).rejects.toThrow(
-          BadRequestException,
-      );
+      await expect(controller.create(dto)).rejects.toThrow(BadRequestException);
     });
 
     it('should throw InternalServerErrorException', async () => {
       const dto = { name: 'Screen' } as CreateScreenDto;
 
       mockScreenService.create.mockRejectedValue(
-          new InternalServerErrorException(),
+        new InternalServerErrorException(),
       );
 
       await expect(controller.create(dto)).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
@@ -89,11 +91,11 @@ describe('ScreenController', () => {
 
     it('should throw InternalServerErrorException', async () => {
       mockScreenService.findAll.mockRejectedValue(
-          new InternalServerErrorException(),
+        new InternalServerErrorException(),
       );
 
       await expect(controller.findAll()).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
@@ -109,18 +111,18 @@ describe('ScreenController', () => {
 
     it('should throw NotFoundException', async () => {
       mockScreenService.findOne.mockRejectedValue(
-          new NotFoundException('Screen not found'),
+        new NotFoundException('Screen not found'),
       );
 
       await expect(controller.findOne('999')).rejects.toThrow(
-          NotFoundException,
+        NotFoundException,
       );
     });
   });
 
   describe('update', () => {
     it('should update screen successfully', async () => {
-      const dto: UpdateScreenDto = { name: 'Updated Screen' } as any;
+      const dto: UpdateScreenDto = { name: 'Updated Screen' };
       const result = { id: '1', ...dto };
 
       mockScreenService.update.mockResolvedValue(result);
@@ -130,22 +132,22 @@ describe('ScreenController', () => {
 
     it('should throw NotFoundException', async () => {
       mockScreenService.update.mockRejectedValue(
-          new NotFoundException('Screen not found'),
+        new NotFoundException('Screen not found'),
       );
 
-      await expect(
-          controller.update('999', {} as UpdateScreenDto),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.update('999', {})).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BadRequestException', async () => {
       mockScreenService.update.mockRejectedValue(
-          new BadRequestException('Invalid update data'),
+        new BadRequestException('Invalid update data'),
       );
 
-      await expect(
-          controller.update('1', {} as UpdateScreenDto),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.update('1', {})).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -162,21 +164,19 @@ describe('ScreenController', () => {
 
     it('should throw NotFoundException', async () => {
       mockScreenService.remove.mockRejectedValue(
-          new NotFoundException('Screen not found'),
+        new NotFoundException('Screen not found'),
       );
 
-      await expect(controller.remove('999')).rejects.toThrow(
-          NotFoundException,
-      );
+      await expect(controller.remove('999')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw InternalServerErrorException', async () => {
       mockScreenService.remove.mockRejectedValue(
-          new InternalServerErrorException(),
+        new InternalServerErrorException(),
       );
 
       await expect(controller.remove('1')).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });

@@ -73,9 +73,9 @@ describe('MoviesService', () => {
       const file = { originalname: 'poster.png' } as any;
 
       const res = await service.create(
-          { title: 'Movie' } as any,
-          file,
-          'user1',
+        { title: 'Movie' } as any,
+        file,
+        'user1',
       );
 
       expect(fileUploadServiceMock.uploadFile).toHaveBeenCalled();
@@ -86,32 +86,29 @@ describe('MoviesService', () => {
       prismaMock.movie.create.mockRejectedValue(new Error('DB crash'));
 
       await expect(service.create({ title: 'A' } as any)).rejects.toThrow(
-          'DB crash',
+        'DB crash',
       );
     });
 
     it('should throw error on upload failure', async () => {
       fileUploadServiceMock.uploadFile.mockRejectedValue(
-          new Error('upload fail'),
+        new Error('upload fail'),
       );
 
       await expect(
-          service.create({ title: 'A' } as any, {} as any, 'u1'),
+        service.create({ title: 'A' } as any, {} as any, 'u1'),
       ).rejects.toThrow('upload fail');
     });
   });
 
   describe('findAll', () => {
     it('should return movies with pagination', async () => {
-      prismaMock.$transaction.mockResolvedValue([
-        [{ id: '1' }],
-        1,
-      ]);
+      prismaMock.$transaction.mockResolvedValue([[{ id: '1' }], 1]);
 
       const res = await service.findAll({
         page: 1,
         limit: 10,
-      } as any);
+      });
 
       expect(res.data.length).toBe(1);
       expect(res.pagination.total).toBe(1);
@@ -134,7 +131,7 @@ describe('MoviesService', () => {
       prismaMock.$transaction.mockRejectedValue(new Error('DB fail'));
 
       await expect(service.findAll({} as any)).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
@@ -151,9 +148,7 @@ describe('MoviesService', () => {
     it('should throw NotFoundException', async () => {
       prismaMock.movie.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOne('1')).rejects.toThrow(
-          NotFoundException,
-      );
+      await expect(service.findOne('1')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw db error', async () => {
@@ -169,7 +164,7 @@ describe('MoviesService', () => {
 
       prismaMock.movie.update.mockResolvedValue({ id: '1' });
 
-      const res = await service.update('1', {} as any);
+      const res = await service.update('1', {});
 
       expect(res.id).toBe('1');
     });
@@ -186,12 +181,7 @@ describe('MoviesService', () => {
 
       prismaMock.movie.update.mockResolvedValue({ id: '1' });
 
-      const res = await service.update(
-          '1',
-          { title: 'new' } as any,
-          {} as any,
-          'u1',
-      );
+      const res = await service.update('1', { title: 'new' }, {} as any, 'u1');
 
       expect(fileUploadServiceMock.uploadFile).toHaveBeenCalled();
       expect(res.id).toBe('1');
@@ -201,7 +191,7 @@ describe('MoviesService', () => {
       prismaMock.movie.findUnique.mockResolvedValue(null);
 
       await expect(service.update('1', {} as any)).rejects.toThrow(
-          NotFoundException,
+        NotFoundException,
       );
     });
 
@@ -209,11 +199,11 @@ describe('MoviesService', () => {
       prismaMock.movie.findUnique.mockResolvedValue({ id: '1' });
 
       fileUploadServiceMock.uploadFile.mockRejectedValue(
-          new Error('upload fail'),
+        new Error('upload fail'),
       );
 
       await expect(
-          service.update('1', {} as any, {} as any, 'u1'),
+        service.update('1', {} as any, {} as any, 'u1'),
       ).rejects.toThrow('upload fail');
     });
 
@@ -222,9 +212,7 @@ describe('MoviesService', () => {
 
       prismaMock.movie.update.mockRejectedValue(new Error('DB fail'));
 
-      await expect(service.update('1', {} as any)).rejects.toThrow(
-          'DB fail',
-      );
+      await expect(service.update('1', {} as any)).rejects.toThrow('DB fail');
     });
   });
 
@@ -263,9 +251,7 @@ describe('MoviesService', () => {
     it('should throw NotFoundException', async () => {
       prismaMock.movie.findUnique.mockResolvedValue(null);
 
-      await expect(service.remove('1')).rejects.toThrow(
-          NotFoundException,
-      );
+      await expect(service.remove('1')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw error when cloud delete fails', async () => {
@@ -280,7 +266,7 @@ describe('MoviesService', () => {
       });
 
       fileUploadServiceMock.cloudinary.deleteFile.mockRejectedValue(
-          new Error('cloud fail'),
+        new Error('cloud fail'),
       );
 
       await expect(service.remove('1')).rejects.toThrow('cloud fail');

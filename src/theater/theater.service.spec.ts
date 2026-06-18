@@ -5,7 +5,8 @@ import { FileUploadService } from '../file-upload/file-upload.service';
 import {
   NotFoundException,
   BadRequestException,
-  InternalServerErrorException, Logger,
+  InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 
 describe('TheaterService', () => {
@@ -68,16 +69,16 @@ describe('TheaterService', () => {
       prisma.theater.create.mockResolvedValue({ id: '1' });
 
       const result = await service.create(
-          { name: 'T1' } as any,
-          mockFile,
-          'user1',
+        { name: 'T1' } as any,
+        mockFile,
+        'user1',
       );
 
       expect(fileUploadService.uploadFile).toHaveBeenCalled();
       expect(prisma.theater.create).toHaveBeenCalledWith(
-          expect.objectContaining({
-            data: expect.objectContaining({ imageId: 'file1' }),
-          }),
+        expect.objectContaining({
+          data: expect.objectContaining({ imageId: 'file1' }),
+        }),
       );
 
       expect(result.id).toBe('1');
@@ -87,14 +88,16 @@ describe('TheaterService', () => {
       prisma.theater.create.mockRejectedValue(new Error('DB error'));
 
       await expect(service.create({ name: 'T1' } as any)).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
     it('should throw InternalServerErrorException when file upload fails', async () => {
-      fileUploadService.uploadFile.mockRejectedValue(new Error('Upload failed'));
+      fileUploadService.uploadFile.mockRejectedValue(
+        new Error('Upload failed'),
+      );
 
       await expect(
-          service.create({ name: 'T1' } as any, mockFile, 'user1'),
+        service.create({ name: 'T1' } as any, mockFile, 'user1'),
       ).rejects.toThrow(InternalServerErrorException);
 
       expect(fileUploadService.uploadFile).toHaveBeenCalled();
@@ -107,7 +110,7 @@ describe('TheaterService', () => {
       prisma.theater.create.mockRejectedValue(new Error('DB error'));
 
       await expect(
-          service.create({ name: 'T1' } as any, mockFile, 'user1'),
+        service.create({ name: 'T1' } as any, mockFile, 'user1'),
       ).rejects.toThrow(InternalServerErrorException);
 
       expect(fileUploadService.uploadFile).toHaveBeenCalled();
@@ -121,24 +124,18 @@ describe('TheaterService', () => {
       await service.create({ name: 'T1' } as any, mockFile, 'user1');
 
       const uploadCallIndex =
-          fileUploadService.uploadFile.mock.invocationCallOrder[0];
-      const prismaCallIndex =
-          prisma.theater.create.mock.invocationCallOrder[0];
+        fileUploadService.uploadFile.mock.invocationCallOrder[0];
+      const prismaCallIndex = prisma.theater.create.mock.invocationCallOrder[0];
 
       expect(uploadCallIndex).toBeLessThan(prismaCallIndex);
     });
-
   });
-
 
   describe('findAll', () => {
     it('should return paginated data', async () => {
-      prisma.$transaction.mockResolvedValue([
-        [{ id: '1' }],
-        1,
-      ]);
+      prisma.$transaction.mockResolvedValue([[{ id: '1' }], 1]);
 
-      const result = await service.findAll({ page: 1, limit: 10 } as any);
+      const result = await service.findAll({ page: 1, limit: 10 });
 
       expect(result.data.length).toBe(1);
       expect(result.pagination.total).toBe(1);
@@ -148,50 +145,50 @@ describe('TheaterService', () => {
       prisma.$transaction.mockRejectedValue(new Error('DB error'));
 
       await expect(service.findAll({} as any)).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
 
     it('should use default pagination values when not provided', async () => {
       prisma.$transaction.mockResolvedValue([[{ id: '1' }], 1]);
 
-      await service.findAll({} as any);
+      await service.findAll({});
 
       expect(prisma.theater.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            skip: 0,
-            take: 10,
-          }),
+        expect.objectContaining({
+          skip: 0,
+          take: 10,
+        }),
       );
     });
 
     it('should calculate skip correctly for page 3', async () => {
       prisma.$transaction.mockResolvedValue([[{ id: '1' }], 1]);
 
-      await service.findAll({ page: 3, limit: 5 } as any);
+      await service.findAll({ page: 3, limit: 5 });
 
       expect(prisma.theater.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            skip: 10,
-            take: 5,
-          }),
+        expect.objectContaining({
+          skip: 10,
+          take: 5,
+        }),
       );
     });
 
     it('should apply search filter', async () => {
       prisma.$transaction.mockResolvedValue([[{ id: '1' }], 1]);
 
-      await service.findAll({ search: 'imax' } as any);
+      await service.findAll({ search: 'imax' });
 
       expect(prisma.theater.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              name: {
-                contains: 'imax',
-                mode: 'insensitive',
-              },
-            }),
+        expect.objectContaining({
+          where: expect.objectContaining({
+            name: {
+              contains: 'imax',
+              mode: 'insensitive',
+            },
           }),
+        }),
       );
     });
 
@@ -201,11 +198,11 @@ describe('TheaterService', () => {
       await service.findAll({ status: 'ACTIVE' } as any);
 
       expect(prisma.theater.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              status: 'ACTIVE',
-            }),
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: 'ACTIVE',
           }),
+        }),
       );
     });
 
@@ -218,22 +215,22 @@ describe('TheaterService', () => {
       } as any);
 
       expect(prisma.theater.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: {
-              status: 'ACTIVE',
-              name: {
-                contains: 'imax',
-                mode: 'insensitive',
-              },
+        expect.objectContaining({
+          where: {
+            status: 'ACTIVE',
+            name: {
+              contains: 'imax',
+              mode: 'insensitive',
             },
-          }),
+          },
+        }),
       );
     });
 
     it('should return empty data when no theaters found', async () => {
       prisma.$transaction.mockResolvedValue([[], 0]);
 
-      const result = await service.findAll({} as any);
+      const result = await service.findAll({});
 
       expect(result.data).toEqual([]);
       expect(result.pagination.total).toBe(0);
@@ -243,7 +240,7 @@ describe('TheaterService', () => {
     it('should calculate totalPages correctly', async () => {
       prisma.$transaction.mockResolvedValue([[], 25]);
 
-      const result = await service.findAll({ limit: 10 } as any);
+      const result = await service.findAll({ limit: 10 });
 
       expect(result.pagination.totalPages).toBe(3);
     });
@@ -251,13 +248,13 @@ describe('TheaterService', () => {
     it('should include screens and order by createdAt desc', async () => {
       prisma.$transaction.mockResolvedValue([[{ id: '1' }], 1]);
 
-      await service.findAll({} as any);
+      await service.findAll({});
 
       expect(prisma.theater.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            orderBy: { createdAt: 'desc' },
-            include: { screens: true },
-          }),
+        expect.objectContaining({
+          orderBy: { createdAt: 'desc' },
+          include: { screens: true },
+        }),
       );
     });
   });
@@ -274,16 +271,14 @@ describe('TheaterService', () => {
     it('should throw NotFoundException', async () => {
       prisma.theater.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOne('1')).rejects.toThrow(
-          NotFoundException,
-      );
+      await expect(service.findOne('1')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw InternalServerErrorException on DB error', async () => {
       prisma.theater.findUnique.mockRejectedValue(new Error('DB error'));
 
       await expect(service.findOne('1')).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
@@ -293,7 +288,7 @@ describe('TheaterService', () => {
       prisma.theater.findUnique.mockResolvedValue({ id: '1' });
       prisma.theater.update.mockResolvedValue({ id: '1' });
 
-      const result = await service.update('1', { name: 'new' } as any);
+      const result = await service.update('1', { name: 'new' });
 
       expect(prisma.theater.update).toHaveBeenCalled();
       expect(result.id).toBe('1');
@@ -310,11 +305,11 @@ describe('TheaterService', () => {
 
       prisma.theater.update.mockResolvedValue({ id: '1' });
 
-      await service.update('1', { name: 'new' } as any, mockFile, 'u1');
+      await service.update('1', { name: 'new' }, mockFile, 'u1');
 
       expect(fileUploadService.uploadFile).toHaveBeenCalled();
       expect(fileUploadService.cloudinary.deleteFile).toHaveBeenCalledWith(
-          'public1',
+        'public1',
       );
       expect(prisma.file.delete).toHaveBeenCalledWith({
         where: { id: 'img1' },
@@ -325,7 +320,7 @@ describe('TheaterService', () => {
       prisma.theater.findUnique.mockResolvedValue(null);
 
       await expect(service.update('1', {} as any)).rejects.toThrow(
-          NotFoundException,
+        NotFoundException,
       );
     });
 
@@ -333,7 +328,7 @@ describe('TheaterService', () => {
       prisma.theater.findUnique.mockRejectedValue(new Error('DB error'));
 
       await expect(service.update('1', {} as any)).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
@@ -360,9 +355,7 @@ describe('TheaterService', () => {
         image: null,
       });
 
-      await expect(service.remove('1')).rejects.toThrow(
-          BadRequestException,
-      );
+      await expect(service.remove('1')).rejects.toThrow(BadRequestException);
     });
 
     it('should delete image before deleting theater', async () => {
@@ -378,7 +371,7 @@ describe('TheaterService', () => {
       await service.remove('1');
 
       expect(fileUploadService.cloudinary.deleteFile).toHaveBeenCalledWith(
-          'pub1',
+        'pub1',
       );
       expect(prisma.file.delete).toHaveBeenCalledWith({
         where: { id: 'img1' },
@@ -388,16 +381,14 @@ describe('TheaterService', () => {
     it('should throw NotFoundException', async () => {
       prisma.theater.findUnique.mockResolvedValue(null);
 
-      await expect(service.remove('1')).rejects.toThrow(
-          NotFoundException,
-      );
+      await expect(service.remove('1')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw InternalServerErrorException on fail', async () => {
       prisma.theater.findUnique.mockRejectedValue(new Error('DB error'));
 
       await expect(service.remove('1')).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });

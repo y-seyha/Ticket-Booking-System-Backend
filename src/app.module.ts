@@ -12,6 +12,8 @@ import { ScreenModule } from './screen/screen.module';
 import { ScreenTemplateModule } from './screen-template/screen-template.module';
 import { SeatTemplateModule } from './seat-template/seat-template.module';
 import { SeatModule } from './seat/seat.module';
+import { ShowtimeModule } from './showtime/showtime.module';
+import { SeatPricingModule } from './seat-pricing/seat-pricing.module';
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { SeatModule } from './seat/seat.module';
     ScreenTemplateModule,
     SeatTemplateModule,
     SeatModule,
+    ShowtimeModule,
+    SeatPricingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

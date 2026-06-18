@@ -2,13 +2,21 @@ import {
   Injectable,
   Logger,
   BadRequestException,
-  UnauthorizedException, NotFoundException, InternalServerErrorException,
+  UnauthorizedException,
+  NotFoundException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { MailerService } from '../utils/generateEmail';
-import {Account, AccountStatus, PasswordResetToken, TokenType, VerificationToken} from '@prisma/client';
+import {
+  Account,
+  AccountStatus,
+  PasswordResetToken,
+  TokenType,
+  VerificationToken,
+} from '@prisma/client';
 import { CustomerThrottlerStore } from './throttler/customer-throttler.store';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -194,29 +202,25 @@ export class AuthenticationService {
 
       if (!account.passwordHash) {
         throw new UnauthorizedException(
-            'This account uses social login. Please sign in with Google, Github, Facebook, or Discord.',
+          'This account uses social login. Please sign in with Google, Github, Facebook, or Discord.',
         );
       }
 
-      const match = await bcrypt.compare(
-          dto.password,
-          account.passwordHash,
-      );
+      const match = await bcrypt.compare(dto.password, account.passwordHash);
 
       if (!match) {
         throw new UnauthorizedException('Invalid email or password');
       }
 
-
       if (account.twoFactorEnabled) {
         const tempToken = this.jwt.sign(
-            { sub: account.id, type: '2fa-pending' },
-            { expiresIn: '5m' },
+          { sub: account.id, type: '2fa-pending' },
+          { expiresIn: '5m' },
         );
 
         return {
           requiresTwoFactor: true,
-          tempToken
+          tempToken,
         };
       }
 
@@ -399,7 +403,7 @@ export class AuthenticationService {
 
     const safeEmail = email ?? null;
 
-    let oauth = await this.prisma.oAuthAccount.findUnique({
+    const oauth = await this.prisma.oAuthAccount.findUnique({
       where: {
         provider_providerUserId: {
           provider,
@@ -415,7 +419,7 @@ export class AuthenticationService {
 
     if (!safeEmail) {
       throw new BadRequestException(
-          `${provider} did not return email. Enable email permission.`
+        `${provider} did not return email. Enable email permission.`,
       );
     }
 
@@ -465,7 +469,7 @@ export class AuthenticationService {
       name: `YourApp (${account.email})`,
     });
 
-    const qrCode = await QRCode.toDataURL(secret.otpauth_url!);
+    const qrCode = await QRCode.toDataURL(secret.otpauth_url);
 
     await this.prisma.twoFactorAuth.upsert({
       where: { accountId: userId },
@@ -546,7 +550,6 @@ export class AuthenticationService {
       include: { twoFactorAuth: true },
     });
 
-
     if (!account?.twoFactorAuth) {
       throw new UnauthorizedException('2FA not enabled');
     }
@@ -571,9 +574,9 @@ export class AuthenticationService {
     const iv = crypto.randomBytes(12);
 
     const key = crypto
-        .createHash('sha256')
-        .update(process.env.ENCRYPTION_KEY!)
-        .digest();
+      .createHash('sha256')
+      .update(process.env.ENCRYPTION_KEY!)
+      .digest();
 
     const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
 
@@ -609,9 +612,9 @@ export class AuthenticationService {
     const encryptedText = Buffer.from(encryptedHex, 'hex');
 
     const key = crypto
-        .createHash('sha256')
-        .update(process.env.ENCRYPTION_KEY!)
-        .digest();
+      .createHash('sha256')
+      .update(process.env.ENCRYPTION_KEY!)
+      .digest();
 
     const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
 
@@ -694,9 +697,7 @@ export class AuthenticationService {
     }
 
     if (account.status !== AccountStatus.DELETED) {
-      throw new BadRequestException(
-          'Only deleted accounts can be reactivated',
-      );
+      throw new BadRequestException('Only deleted accounts can be reactivated');
     }
 
     const rawToken = crypto.randomUUID();
@@ -712,8 +713,8 @@ export class AuthenticationService {
     });
 
     await this.mailerService.sendReactivateAccountEmail(
-        account.email,
-        rawToken,
+      account.email,
+      rawToken,
     );
 
     return {
@@ -744,9 +745,7 @@ export class AuthenticationService {
     }
 
     if (!matchedToken) {
-      throw new BadRequestException(
-          'Invalid or expired reactivation token',
-      );
+      throw new BadRequestException('Invalid or expired reactivation token');
     }
 
     await this.prisma.$transaction([

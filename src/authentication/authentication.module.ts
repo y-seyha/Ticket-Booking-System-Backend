@@ -8,10 +8,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailerService } from '../utils/generateEmail';
 import { CustomerThrottlerStore } from './throttler/customer-throttler.store';
 import { CustomerThrottlerGuard } from './guards/customer-throttler.guard';
-import {GoogleStrategy} from "./oauth-strategy/google.strategy";
-import {GithubStrategy} from "./oauth-strategy/github.strategy";
-import {FacebookStrategy} from "./oauth-strategy/facebook.strategy";
-import {DiscordStrategy} from "./oauth-strategy/discord.strategy";
+import { GoogleStrategy } from './oauth-strategy/google.strategy';
+import { GithubStrategy } from './oauth-strategy/github.strategy';
+import { FacebookStrategy } from './oauth-strategy/facebook.strategy';
+import { DiscordStrategy } from './oauth-strategy/discord.strategy';
 
 @Module({
   imports: [

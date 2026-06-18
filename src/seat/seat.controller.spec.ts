@@ -42,11 +42,11 @@ describe('SeatController', () => {
 
     it('should throw InternalServerErrorException', async () => {
       mockService.getSeatsByScreen.mockRejectedValue(
-          new InternalServerErrorException(),
+        new InternalServerErrorException(),
       );
 
       await expect(controller.getSeats('screen-1')).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
@@ -61,22 +61,20 @@ describe('SeatController', () => {
     });
 
     it('should throw NotFoundException', async () => {
-      mockService.getSeatMap.mockRejectedValue(
-          new NotFoundException(),
-      );
+      mockService.getSeatMap.mockRejectedValue(new NotFoundException());
 
       await expect(controller.getSeatMap('bad')).rejects.toThrow(
-          NotFoundException,
+        NotFoundException,
       );
     });
 
     it('should throw InternalServerErrorException', async () => {
       mockService.getSeatMap.mockRejectedValue(
-          new InternalServerErrorException(),
+        new InternalServerErrorException(),
       );
 
       await expect(controller.getSeatMap('show-1')).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
@@ -96,46 +94,37 @@ describe('SeatController', () => {
 
       expect(await controller.lockSeat(user as any, dto)).toEqual(result);
 
-      expect(mockService.lockSeat).toHaveBeenCalledWith(
-          'user-1',
-          dto,
-      );
+      expect(mockService.lockSeat).toHaveBeenCalledWith('user-1', dto);
     });
 
     it('should throw BadRequestException', async () => {
-      mockService.lockSeat.mockRejectedValue(
-          new BadRequestException(),
-      );
+      mockService.lockSeat.mockRejectedValue(new BadRequestException());
 
-      await expect(
-          controller.lockSeat(user as any, dto),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.lockSeat(user as any, dto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw NotFoundException', async () => {
-      mockService.lockSeat.mockRejectedValue(
-          new NotFoundException(),
-      );
+      mockService.lockSeat.mockRejectedValue(new NotFoundException());
 
-      await expect(
-          controller.lockSeat(user as any, dto),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.lockSeat(user as any, dto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw InternalServerErrorException', async () => {
       mockService.lockSeat.mockRejectedValue(
-          new InternalServerErrorException(),
+        new InternalServerErrorException(),
       );
 
-      await expect(
-          controller.lockSeat(user as any, dto),
-      ).rejects.toThrow(InternalServerErrorException);
+      await expect(controller.lockSeat(user as any, dto)).rejects.toThrow(
+        InternalServerErrorException,
+      );
     });
 
     it('should fail if user is missing', () => {
-      expect(() =>
-          controller.lockSeat(undefined as any, dto),
-      ).toThrow();
+      expect(() => controller.lockSeat(undefined as any, dto)).toThrow();
     });
   });
 
@@ -148,47 +137,39 @@ describe('SeatController', () => {
       });
 
       expect(
-          await controller.unlockSeat(
-              req as any,
-              'show-1',
-              'seat-1',
-          ),
+        await controller.unlockSeat(req as any, 'show-1', 'seat-1'),
       ).toEqual({ message: 'Unlocked' });
 
       expect(mockService.unlockSeat).toHaveBeenCalledWith(
-          'user-1',
-          'seat-1',
-          'show-1',
+        'user-1',
+        'seat-1',
+        'show-1',
       );
     });
 
     it('should throw NotFoundException', async () => {
-      mockService.unlockSeat.mockRejectedValue(
-          new NotFoundException(),
-      );
+      mockService.unlockSeat.mockRejectedValue(new NotFoundException());
 
       await expect(
-          controller.unlockSeat(req as any, 'show-1', 'seat-1'),
+        controller.unlockSeat(req as any, 'show-1', 'seat-1'),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BadRequestException', async () => {
-      mockService.unlockSeat.mockRejectedValue(
-          new BadRequestException(),
-      );
+      mockService.unlockSeat.mockRejectedValue(new BadRequestException());
 
       await expect(
-          controller.unlockSeat(req as any, 'show-1', 'seat-1'),
+        controller.unlockSeat(req as any, 'show-1', 'seat-1'),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw InternalServerErrorException', async () => {
       mockService.unlockSeat.mockRejectedValue(
-          new InternalServerErrorException(),
+        new InternalServerErrorException(),
       );
 
       await expect(
-          controller.unlockSeat(req as any, 'show-1', 'seat-1'),
+        controller.unlockSeat(req as any, 'show-1', 'seat-1'),
       ).rejects.toThrow(InternalServerErrorException);
     });
   });

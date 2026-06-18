@@ -7,7 +7,8 @@ import {
   Get,
   Query,
   UseInterceptors,
-  Req, Param,
+  Req,
+  Param,
 } from '@nestjs/common';
 import type { Response } from 'express';
 
@@ -30,8 +31,8 @@ import { CustomerThrottlerInterceptor } from './interceptor/customer-throttler.i
 import { CustomerThrottlerGuard } from './guards/customer-throttler.guard';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import {AuthGuard} from "@nestjs/passport";
-import {ReactivateAccountDto} from "./dto/reactivate-account.dto";
+import { AuthGuard } from '@nestjs/passport';
+import { ReactivateAccountDto } from './dto/reactivate-account.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -78,9 +79,7 @@ export class AuthenticationController {
 
   @Post('reactivate')
   @ApiOperation({ summary: 'Request account reactivation' })
-  async reactivate(
-      @Body() dto: ReactivateAccountDto,
-  ) {
+  async reactivate(@Body() dto: ReactivateAccountDto) {
     return this.auth.reactivateAccount(dto.email);
   }
 
@@ -89,10 +88,7 @@ export class AuthenticationController {
     name: 'token',
     required: true,
   })
-  async confirmReactivate(
-      @Query('token') token: string,
-      @Res() res: Response,
-  ) {
+  async confirmReactivate(@Query('token') token: string, @Res() res: Response) {
     await this.auth.confirmReactivation(token);
 
     return res.send(`
@@ -117,19 +113,16 @@ export class AuthenticationController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Enable 2FA after verifying code' })
-  async enable2FA(
-      @CurrentUser() user: any,
-      @Body('code') code: string,
-  ) {
+  async enable2FA(@CurrentUser() user: any, @Body('code') code: string) {
     return this.auth.enable2FA(user.id, code);
   }
 
   @Post('2fa/verify')
   async verify2FA(
-      @Body('tempToken') tempToken: string,
-      @Body('code') code: string,
-      @Req() req: any,
-      @Res({ passthrough: true }) res: Response,
+    @Body('tempToken') tempToken: string,
+    @Body('code') code: string,
+    @Req() req: any,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.auth.verify2FA(tempToken, code, req);
 
@@ -208,7 +201,10 @@ export class AuthenticationController {
 
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
-  async googleCallback(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+  async googleCallback(
+    @Req() req: any,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const account = await this.auth.validateOAuthLogin(req.user);
 
     const tokens = await this.auth.issueTokens(account, req, {
@@ -228,14 +224,16 @@ export class AuthenticationController {
     };
   }
 
-
   @Get('github')
   @UseGuards(AuthGuard('github'))
   githubAuth() {}
 
   @Get('github/callback')
   @UseGuards(AuthGuard('github'))
-  async githubCallback(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+  async githubCallback(
+    @Req() req: any,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const account = await this.auth.validateOAuthLogin(req.user);
 
     const tokens = await this.auth.issueTokens(account, req, {
@@ -261,7 +259,10 @@ export class AuthenticationController {
 
   @Get('facebook/callback')
   @UseGuards(AuthGuard('facebook'))
-  async facebookCallback(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+  async facebookCallback(
+    @Req() req: any,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const account = await this.auth.validateOAuthLogin(req.user);
 
     const tokens = await this.auth.issueTokens(account, req, {
@@ -287,7 +288,10 @@ export class AuthenticationController {
 
   @Get('discord/callback')
   @UseGuards(AuthGuard('discord'))
-  async discordCallback(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+  async discordCallback(
+    @Req() req: any,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const account = await this.auth.validateOAuthLogin(req.user);
 
     const tokens = await this.auth.issueTokens(account, req, {

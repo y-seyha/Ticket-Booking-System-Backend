@@ -58,6 +58,7 @@ enum ScreenType {
   STANDARD
   VIP
   IMAX
+  THREE_D
 }
 
 enum SeatType {
@@ -99,21 +100,21 @@ enum PaymentStatus {
 }
 
 model Account {
-  id           String        @id @default(uuid())
-  email        String        @unique
-  passwordHash String?
-  role         Role          @default(USER)
-  status       AccountStatus @default(ACTIVE)
-  emailVerified    Boolean @default(false)
-  phoneVerified    Boolean @default(false)
-  twoFactorEnabled Boolean @default(false)
-  failedLoginAttempts Int       @default(0)
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  passwordHash        String?
+  role                Role                 @default(USER)
+  status              AccountStatus        @default(ACTIVE)
+  emailVerified       Boolean              @default(false)
+  phoneVerified       Boolean              @default(false)
+  twoFactorEnabled    Boolean              @default(false)
+  failedLoginAttempts Int                  @default(0)
   lockedUntil         DateTime?
   lastLoginAt         DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  profile UserProfile?
-  oauthAccounts OAuthAccount[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  profile             UserProfile?
+  oauthAccounts       OAuthAccount[]
   refreshTokens       RefreshToken[]
   verificationTokens  VerificationToken[]
   passwordResetTokens PasswordResetToken[]
@@ -121,61 +122,64 @@ model Account {
   loginSessions       LoginSession[]
   uploadedFiles       File[]
   bookings            Booking[]
-  seatLocks SeatLock[]
+  seatLocks           SeatLock[]
 }
 
 model UserProfile {
-  id        String @id @default(uuid())
-  accountId String @unique
+  id        String            @id @default(uuid())
+  accountId String            @unique
   firstName String
   lastName  String
-  phone     String? @unique
-  avatarId String? @unique
-  avatar   File?   @relation(fields: [avatarId], references: [id])
-  status UserProfileStatus
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  phone     String?           @unique
+  avatarId  String?           @unique
+  avatar    File?             @relation(fields: [avatarId], references: [id])
+  status    UserProfileStatus
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  account   Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }
 
 model RefreshToken {
-  id        String @id @default(uuid())
-  accountId String
-  tokenHash String
-  deviceId   String?
-  deviceInfo String?
-  ipAddress  String?
-  expiresAt DateTime
-  revokedAt DateTime?
+  id                String         @id @default(uuid())
+  accountId         String
+  tokenHash         String
+  deviceId          String?
+  deviceInfo        String?
+  ipAddress         String?
+  expiresAt         DateTime
+  revokedAt         DateTime?
   replacedByTokenId String?
-  createdAt DateTime @default(now())
-  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  replacedBy RefreshToken? @relation("TokenRotation", fields: [replacedByTokenId], references: [id], onDelete: SetNull)
-  replacedTokens RefreshToken[] @relation("TokenRotation")
-  sessions LoginSession[]
+  createdAt         DateTime       @default(now())
+  account           Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  replacedBy        RefreshToken?  @relation("TokenRotation", fields: [replacedByTokenId], references: [id], onDelete: SetNull)
+  replacedTokens    RefreshToken[] @relation("TokenRotation")
+  sessions          LoginSession[]
+
   @@index([accountId])
 }
 
 model VerificationToken {
-  id        String @id @default(uuid())
+  id        String    @id @default(uuid())
   accountId String
   tokenHash String
   type      TokenType
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
-  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  account   Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
   @@index([accountId])
 }
 
 model PasswordResetToken {
-  id        String @id @default(uuid())
+  id        String    @id @default(uuid())
   accountId String
   tokenHash String
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
-  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  account   Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
   @@index([accountId])
 }
 
@@ -223,37 +227,37 @@ model LoginSession {
 }
 
 model OAuthAccount {
-  id String @id @default(uuid())
-  accountId String
-  provider AuthProvider
+  id             String       @id @default(uuid())
+  accountId      String
+  provider       AuthProvider
   providerUserId String
-  providerEmail String?
-  displayName String?
-  username    String?
-  avatarUrl String?
-  accessToken  String?
-  refreshToken String?
-  linkedAt   DateTime  @default(now())
-  lastUsedAt DateTime?
-  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  providerEmail  String?
+  displayName    String?
+  username       String?
+  avatarUrl      String?
+  accessToken    String?
+  refreshToken   String?
+  linkedAt       DateTime     @default(now())
+  lastUsedAt     DateTime?
+  account        Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerUserId])
   @@index([accountId])
 }
 
 model File {
-  id String @id @default(uuid())
-  originalName String
-  mimeType     String
-  size         Int
-  url      String
-  publicId String @unique
-  description String?
+  id            String   @id @default(uuid())
+  originalName  String
+  mimeType      String
+  size          Int
+  url           String
+  publicId      String   @unique
+  description   String?
   uploaderId    String?
   posterOfMovie Movie?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  uploader Account? @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  uploader      Account? @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
 
   avatarOfUser UserProfile?
   theaterOf    Theater?
@@ -262,16 +266,16 @@ model File {
 }
 
 model Movie {
-  id String @id @default(uuid())
-  title       String
-  description String?
-  durationMinutes Int
-  language        String
-  releaseDate     DateTime
-  posterId String? @unique
-  poster   File?   @relation(fields: [posterId], references: [id])
+  id               String      @id @default(uuid())
+  title            String
+  description      String?
+  durationMinutes  Int
+  language         String
+  releaseDate      DateTime
+  posterId         String?     @unique
+  poster           File?       @relation(fields: [posterId], references: [id])
   trailerYoutubeId String?
-  status MovieStatus
+  status           MovieStatus
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -280,15 +284,15 @@ model Movie {
 }
 
 model Theater {
-  id String @id @default(uuid())
+  id       String        @id @default(uuid())
   name     String
   phone    String?
   email    String?
   location String
   city     String
-  status TheaterStatus
-  imageId String? @unique
-  image   File?   @relation(fields: [imageId], references: [id])
+  status   TheaterStatus
+  imageId  String?       @unique
+  image    File?         @relation(fields: [imageId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -297,7 +301,7 @@ model Theater {
 }
 
 model Screen {
-  id String @id @default(uuid())
+  id         String         @id @default(uuid())
   theaterId  String
   templateId String
   name       String
@@ -311,15 +315,16 @@ model Screen {
 }
 
 model ScreenTemplate {
-  id            String               @id @default(uuid())
-  name          String
-  type          ScreenType
-  description   String?
-  isActive      Boolean              @default(true)
-  screens       Screen[]
-  templateSeats ScreenTemplateSeat[]
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  id              String               @id @default(uuid())
+  name            String
+  type            ScreenType
+  description     String?
+  isActive        Boolean              @default(true)
+  screenSurcharge Decimal              @db.Decimal(10, 2)   @default(0)
+  screens         Screen[]
+  templateSeats   ScreenTemplateSeat[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 }
 
 model ScreenTemplateSeat {
@@ -347,25 +352,35 @@ model Seat {
   posY         Int
   seatType     SeatType
   status       SeatStatus
-  screen   Screen @relation(fields: [screenId], references: [id], onDelete: Cascade)
+  screen       Screen        @relation(fields: [screenId], references: [id], onDelete: Cascade)
   bookingSeats BookingSeat[]
-  seatLocks SeatLock[]
+  seatLocks    SeatLock[]
 
   @@unique([screenId, seatRow, seatNumber])
 }
 
+model SeatPricingRule {
+  id            String   @id @default(uuid())
+  seatType      SeatType @unique
+  seatSurcharge Decimal  @db.Decimal(10, 2)  @default(0)
+  isActive      Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model SeatLock {
-  id         String   @id @default(uuid())
+  id String @id @default(uuid())
 
   accountId  String
   seatId     String
   showtimeId String
 
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 
-  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  seat    Seat    @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  account  Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  seat     Seat     @relation(fields: [seatId], references: [id], onDelete: Cascade)
   showtime Showtime @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
 
   @@unique([showtimeId, seatId])
@@ -382,21 +397,16 @@ model Showtime {
   startTime DateTime
   endTime   DateTime
 
-  price Decimal @db.Decimal(10, 2)
+  basePrice Decimal @db.Decimal(10, 2)
 
-  status ShowtimeStatus
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  movie Movie @relation(fields: [movieId], references: [id])
-
-  screen Screen @relation(fields: [screenId], references: [id])
-
-  bookings Booking[]
-
+  status       ShowtimeStatus
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  movie        Movie          @relation(fields: [movieId], references: [id])
+  screen       Screen         @relation(fields: [screenId], references: [id])
+  bookings     Booking[]
   bookingSeats BookingSeat[]
-  seatLocks SeatLock[]
+  seatLocks    SeatLock[]
 
   @@index([movieId])
   @@index([screenId])
@@ -404,48 +414,33 @@ model Showtime {
 }
 
 model Booking {
-  id String @id @default(uuid())
-
-  accountId  String
-  showtimeId String
-
-  bookingCode String @unique
-
-  totalPrice Decimal @db.Decimal(10, 2)
-
-  status BookingStatus
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  account Account @relation(fields: [accountId], references: [id])
-
-  showtime Showtime @relation(fields: [showtimeId], references: [id])
-
+  id           String        @id @default(uuid())
+  accountId    String
+  showtimeId   String
+  bookingCode  String        @unique
+  totalPrice   Decimal       @db.Decimal(10, 2)
+  status       BookingStatus
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  account      Account       @relation(fields: [accountId], references: [id])
+  showtime     Showtime      @relation(fields: [showtimeId], references: [id])
   bookingSeats BookingSeat[]
-
-  payment Payment?
+  payment      Payment?
 
   @@index([accountId])
   @@index([showtimeId])
 }
 
 model BookingSeat {
-  id String @id @default(uuid())
-
+  id         String   @id @default(uuid())
   bookingId  String
   seatId     String
   showtimeId String
-
-  price Decimal @db.Decimal(10, 2)
-
-  createdAt DateTime @default(now())
-
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  seat Seat @relation(fields: [seatId], references: [id])
-
-  showtime Showtime @relation(fields: [showtimeId], references: [id])
+  price      Decimal  @db.Decimal(10, 2)
+  createdAt  DateTime @default(now())
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  seat       Seat     @relation(fields: [seatId], references: [id])
+  showtime   Showtime @relation(fields: [showtimeId], references: [id])
 
   @@unique([bookingId, seatId])
   @@unique([showtimeId, seatId])
@@ -455,26 +450,17 @@ model BookingSeat {
 }
 
 model Payment {
-  id String @id @default(uuid())
-
-  bookingId String @unique
-
-  provider PaymentProvider
-
-  amount Decimal @db.Decimal(10, 2)
-
-  currency String @default("USD")
-
-  status PaymentStatus
-
+  id             String          @id @default(uuid())
+  bookingId      String          @unique
+  provider       PaymentProvider
+  amount         Decimal         @db.Decimal(10, 2)
+  currency       String          @default("USD")
+  status         PaymentStatus
   transactionRef String?
-
-  paidAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  paidAt         DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  booking        Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@index([status])
 }

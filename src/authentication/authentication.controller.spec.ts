@@ -1,12 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthenticationController } from './authentication.controller';
 import { AuthenticationService } from './authentication.service';
-import {
-  BadRequestException,
-  UnauthorizedException,
-} from '@nestjs/common';
-import {CustomerThrottlerGuard} from "./guards/customer-throttler.guard";
-import {CustomerThrottlerStore} from "./throttler/customer-throttler.store";
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { CustomerThrottlerGuard } from './guards/customer-throttler.guard';
+import { CustomerThrottlerStore } from './throttler/customer-throttler.store';
 
 describe('AuthenticationController', () => {
   let controller: AuthenticationController;
@@ -55,10 +52,10 @@ describe('AuthenticationController', () => {
         },
       ],
     })
-        .overrideGuard(CustomerThrottlerGuard)
-        .useValue({ canActivate: () => true })
+      .overrideGuard(CustomerThrottlerGuard)
+      .useValue({ canActivate: () => true })
 
-        .compile();
+      .compile();
 
     controller = module.get(AuthenticationController);
 
@@ -74,8 +71,8 @@ describe('AuthenticationController', () => {
       });
 
       const res = await controller.register(
-          { email: 'a', password: 'b' } as any,
-          resMock,
+        { email: 'a', password: 'b' } as any,
+        resMock,
       );
 
       expect(res.message).toBe('Account created');
@@ -83,13 +80,11 @@ describe('AuthenticationController', () => {
     });
 
     it('error', async () => {
-      authServiceMock.register.mockRejectedValue(
-          new BadRequestException(),
-      );
+      authServiceMock.register.mockRejectedValue(new BadRequestException());
 
-      await expect(
-          controller.register({} as any, resMock),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.register({} as any, resMock)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -102,9 +97,9 @@ describe('AuthenticationController', () => {
       });
 
       const res = await controller.login(
-          { email: 'x', password: 'y' } as any,
-          reqMock,
-          resMock,
+        { email: 'x', password: 'y' },
+        reqMock,
+        resMock,
       );
 
       if ('user' in res) {
@@ -121,9 +116,9 @@ describe('AuthenticationController', () => {
       });
 
       const res = await controller.login(
-          { email: 'x', password: 'y' } as any,
-          reqMock,
-          resMock,
+        { email: 'x', password: 'y' },
+        reqMock,
+        resMock,
       );
 
       if ('requiresTwoFactor' in res) {
@@ -138,11 +133,10 @@ describe('AuthenticationController', () => {
       authServiceMock.login.mockRejectedValue(new UnauthorizedException());
 
       await expect(
-          controller.login({} as any, reqMock, resMock),
+        controller.login({} as any, reqMock, resMock),
       ).rejects.toThrow(UnauthorizedException);
     });
   });
-
 
   describe('setup2FA', () => {
     it('success', async () => {
@@ -157,9 +151,7 @@ describe('AuthenticationController', () => {
     });
 
     it('error', async () => {
-      authServiceMock.setup2FA.mockRejectedValue(
-          new BadRequestException(),
-      );
+      authServiceMock.setup2FA.mockRejectedValue(new BadRequestException());
 
       await expect(controller.setup2FA({ id: '1' })).rejects.toThrow();
     });
@@ -171,22 +163,15 @@ describe('AuthenticationController', () => {
         message: 'enabled',
       });
 
-      const res = await controller.enable2FA(
-          { id: '1' },
-          '123',
-      );
+      const res = await controller.enable2FA({ id: '1' }, '123');
 
       expect(res.message).toBe('enabled');
     });
 
     it('error', async () => {
-      authServiceMock.enable2FA.mockRejectedValue(
-          new BadRequestException(),
-      );
+      authServiceMock.enable2FA.mockRejectedValue(new BadRequestException());
 
-      await expect(
-          controller.enable2FA({ id: '1' }, '123'),
-      ).rejects.toThrow();
+      await expect(controller.enable2FA({ id: '1' }, '123')).rejects.toThrow();
     });
   });
 
@@ -198,24 +183,17 @@ describe('AuthenticationController', () => {
         user: { id: '1' },
       });
 
-      const res = await controller.verify2FA(
-          'temp',
-          '123',
-          reqMock,
-          resMock,
-      );
+      const res = await controller.verify2FA('temp', '123', reqMock, resMock);
 
       expect(res.success).toBe(true);
       expect(resMock.cookie).toHaveBeenCalled();
     });
 
     it('error', async () => {
-      authServiceMock.verify2FA.mockRejectedValue(
-          new BadRequestException(),
-      );
+      authServiceMock.verify2FA.mockRejectedValue(new BadRequestException());
 
       await expect(
-          controller.verify2FA('t', 'c', reqMock, resMock),
+        controller.verify2FA('t', 'c', reqMock, resMock),
       ).rejects.toThrow();
     });
   });
@@ -228,7 +206,7 @@ describe('AuthenticationController', () => {
 
       const res = await controller.forgotPassword({
         email: 'x',
-      } as any);
+      });
 
       expect(res.message).toBe('sent');
     });
@@ -240,10 +218,7 @@ describe('AuthenticationController', () => {
         message: 'ok',
       });
 
-      const res = await controller.resetPassword(
-          'token',
-          {} as any,
-      );
+      const res = await controller.resetPassword('token', {} as any);
 
       expect(res.message).toBe('ok');
     });
@@ -261,14 +236,12 @@ describe('AuthenticationController', () => {
     });
 
     it('error', async () => {
-      authServiceMock.verifyEmail.mockRejectedValue(
-          new BadRequestException(),
-      );
+      authServiceMock.verifyEmail.mockRejectedValue(new BadRequestException());
 
       const res = { send: jest.fn() };
 
       await expect(
-          controller.verifyEmail('token', res as any),
+        controller.verifyEmail('token', res as any),
       ).rejects.toThrow();
     });
   });
@@ -301,29 +274,20 @@ describe('AuthenticationController', () => {
     };
 
     it('google', async () => {
-      await oauthTest(() =>
-          controller.googleCallback(reqMock, resMock),
-      );
+      await oauthTest(() => controller.googleCallback(reqMock, resMock));
     });
 
     it('github', async () => {
-      await oauthTest(() =>
-          controller.githubCallback(reqMock, resMock),
-      );
+      await oauthTest(() => controller.githubCallback(reqMock, resMock));
     });
 
     it('facebook', async () => {
-      await oauthTest(() =>
-          controller.facebookCallback(reqMock, resMock),
-      );
+      await oauthTest(() => controller.facebookCallback(reqMock, resMock));
     });
 
     it('discord', async () => {
-      await oauthTest(() =>
-          controller.discordCallback(reqMock, resMock),
-      );
+      await oauthTest(() => controller.discordCallback(reqMock, resMock));
     });
-
 
     it('login should handle missing request headers safely', async () => {
       authServiceMock.login.mockResolvedValue({
@@ -332,11 +296,11 @@ describe('AuthenticationController', () => {
         user: { sub: '1' },
       });
 
-      const res = await controller.login(
-          { email: 'x', password: 'y' } as any,
-          reqMock,
-          resMock,
-      ) as any;
+      const res = (await controller.login(
+        { email: 'x', password: 'y' },
+        reqMock,
+        resMock,
+      )) as any;
 
       expect(res.user.sub).toBe('1');
       expect(resMock.cookie).toHaveBeenCalled();
@@ -349,9 +313,9 @@ describe('AuthenticationController', () => {
       });
 
       const res: any = await controller.login(
-          { email: 'x', password: 'y' } as any,
-          reqMock,
-          resMock,
+        { email: 'x', password: 'y' },
+        reqMock,
+        resMock,
       );
 
       expect(res.requiresTwoFactor).toBe(true);
@@ -376,12 +340,12 @@ describe('AuthenticationController', () => {
         message: 'Reactivation email sent',
       });
 
-      const res = await controller.reactivate(
-          { email: 'test@test.com' } as any,
-      );
+      const res = await controller.reactivate({
+        email: 'test@test.com',
+      });
 
       expect(authServiceMock.reactivateAccount).toHaveBeenCalledWith(
-          'test@test.com',
+        'test@test.com',
       );
 
       expect(res.message).toBe('Reactivation email sent');
@@ -395,7 +359,7 @@ describe('AuthenticationController', () => {
       await controller.confirmReactivate('token123', res as any);
 
       expect(authServiceMock.confirmReactivation).toHaveBeenCalledWith(
-          'token123',
+        'token123',
       );
 
       expect(res.send).toHaveBeenCalled();
@@ -409,14 +373,14 @@ describe('AuthenticationController', () => {
 
       await controller.logout(reqMock, resMock);
 
-      expect(authServiceMock.logout).toHaveBeenCalledWith(
-          reqMock,
-          resMock,
-      );
+      expect(authServiceMock.logout).toHaveBeenCalledWith(reqMock, resMock);
     });
 
     it('google callback should pass correct device info', async () => {
-      authServiceMock.validateOAuthLogin.mockResolvedValue({ id: '1', email: 'a@test.com' });
+      authServiceMock.validateOAuthLogin.mockResolvedValue({
+        id: '1',
+        email: 'a@test.com',
+      });
 
       authServiceMock.issueTokens.mockResolvedValue({
         accessToken: 'a',
@@ -427,11 +391,11 @@ describe('AuthenticationController', () => {
       await controller.googleCallback(reqMock, resMock);
 
       expect(authServiceMock.issueTokens).toHaveBeenCalledWith(
-          expect.anything(),
-          reqMock,
-          expect.objectContaining({
-            ip: '127.0.0.1',
-          }),
+        expect.anything(),
+        reqMock,
+        expect.objectContaining({
+          ip: '127.0.0.1',
+        }),
       );
     });
 
@@ -439,9 +403,12 @@ describe('AuthenticationController', () => {
       authServiceMock.login.mockRejectedValue(new Error('DB crash'));
 
       await expect(
-          controller.login({ email: 'x', password: 'y' } as any, reqMock, resMock),
+        controller.login(
+          { email: 'x', password: 'y' } as any,
+          reqMock,
+          resMock,
+        ),
       ).rejects.toThrow('DB crash');
     });
-
   });
 });

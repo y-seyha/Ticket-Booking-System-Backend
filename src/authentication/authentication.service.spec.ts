@@ -6,8 +6,8 @@ import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
-import {MailerService} from "../utils/generateEmail";
-import {CustomerThrottlerStore} from "./throttler/customer-throttler.store";
+import { MailerService } from '../utils/generateEmail';
+import { CustomerThrottlerStore } from './throttler/customer-throttler.store';
 
 jest.mock('bcrypt');
 jest.mock('speakeasy');
@@ -66,7 +66,6 @@ describe('AuthenticationService', () => {
     verify: jest.fn(),
   };
 
-
   const throttlerMock = {
     get: jest.fn(),
     set: jest.fn(),
@@ -114,7 +113,7 @@ describe('AuthenticationService', () => {
         password: '123',
         firstName: 'A',
         lastName: 'B',
-      } as any);
+      });
 
       expect(res.message).toContain('Account created');
     });
@@ -145,11 +144,10 @@ describe('AuthenticationService', () => {
       });
 
       await expect(
-          service.register({ email: 'x@test.com' } as any),
+        service.register({ email: 'x@test.com' } as any),
       ).rejects.toThrow(BadRequestException);
     });
   });
-
 
   describe('verifyEmail', () => {
     it('should verify email successfully', async () => {
@@ -170,7 +168,7 @@ describe('AuthenticationService', () => {
       prismaMock.verificationToken.findMany.mockResolvedValue([]);
 
       await expect(service.verifyEmail('bad')).rejects.toThrow(
-          BadRequestException,
+        BadRequestException,
       );
     });
   });
@@ -196,8 +194,8 @@ describe('AuthenticationService', () => {
       prismaMock.loginSession.create.mockResolvedValue({});
 
       const res = await service.login(
-          { email: 'test@test.com', password: '123' } as any,
-          { headers: { 'user-agent': 'jest' }, ip: '127.0.0.1' },
+        { email: 'test@test.com', password: '123' },
+        { headers: { 'user-agent': 'jest' }, ip: '127.0.0.1' },
       );
 
       if ('accessToken' in res) {
@@ -214,7 +212,7 @@ describe('AuthenticationService', () => {
       });
 
       await expect(
-          service.login({ email: 'x', password: '123' } as any, {}),
+        service.login({ email: 'x', password: '123' } as any, {}),
       ).rejects.toThrow(UnauthorizedException);
     });
 
@@ -227,7 +225,7 @@ describe('AuthenticationService', () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       await expect(
-          service.login({ email: 'x', password: '123' } as any, {}),
+        service.login({ email: 'x', password: '123' } as any, {}),
       ).rejects.toThrow(UnauthorizedException);
     });
 
@@ -242,10 +240,7 @@ describe('AuthenticationService', () => {
 
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
-      const res = await service.login(
-          { email: 'x', password: '123' } as any,
-          {},
-      );
+      const res = await service.login({ email: 'x', password: '123' }, {});
 
       if ('requiresTwoFactor' in res) {
         expect(res.requiresTwoFactor).toBe(true);
@@ -253,16 +248,14 @@ describe('AuthenticationService', () => {
       } else {
         throw new Error('Expected 2FA response');
       }
-
     });
   });
-
 
   describe('forgotPassword', () => {
     it('should always return success even if user not found', async () => {
       prismaMock.account.findUnique.mockResolvedValue(null);
 
-      const res = await service.forgotPassword({ email: 'x' } as any);
+      const res = await service.forgotPassword({ email: 'x' });
 
       expect(res.message).toBeDefined();
     });
@@ -274,7 +267,7 @@ describe('AuthenticationService', () => {
 
       prismaMock.passwordResetToken.create.mockResolvedValue({});
 
-      const res = await service.forgotPassword({ email: 'x' } as any);
+      const res = await service.forgotPassword({ email: 'x' });
 
       expect(res.message).toContain('reset');
     });
@@ -294,17 +287,17 @@ describe('AuthenticationService', () => {
       const res = await service.resetPassword('token', {
         newPassword: '123',
         confirmNewPassword: '123',
-      } as any);
+      });
 
       expect(res.message).toBeDefined();
     });
 
     it('should fail password mismatch', async () => {
       await expect(
-          service.resetPassword('t', {
-            newPassword: '1',
-            confirmNewPassword: '2',
-          } as any),
+        service.resetPassword('t', {
+          newPassword: '1',
+          confirmNewPassword: '2',
+        } as any),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -332,9 +325,7 @@ describe('AuthenticationService', () => {
     it('should throw if account not found', async () => {
       prismaMock.account.findUnique.mockResolvedValue(null);
 
-      await expect(service.setup2FA('1')).rejects.toThrow(
-          BadRequestException,
-      );
+      await expect(service.setup2FA('1')).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -372,7 +363,7 @@ describe('AuthenticationService', () => {
 
     it('should throw on invalid format', () => {
       expect(() => (service as any).decrypt('bad')).toThrow(
-          BadRequestException,
+        BadRequestException,
       );
     });
   });
@@ -380,10 +371,10 @@ describe('AuthenticationService', () => {
   describe('handlePrismaError', () => {
     it('should throw email exists', () => {
       expect(() =>
-          (service as any).handlePrismaError({
-            code: 'P2002',
-            meta: { target: ['email'] },
-          }),
+        (service as any).handlePrismaError({
+          code: 'P2002',
+          meta: { target: ['email'] },
+        }),
       ).toThrow(BadRequestException);
     });
   });
@@ -412,9 +403,9 @@ describe('AuthenticationService', () => {
         status: 'ACTIVE',
       });
 
-      await expect(
-          service.reactivateAccount('test@test.com'),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.reactivateAccount('test@test.com')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should return silent response if account not found', async () => {
@@ -448,7 +439,7 @@ describe('AuthenticationService', () => {
     it('should fail invalid token', async () => {
       prismaMock.verificationToken.findMany.mockResolvedValue([]);
       await expect(service.confirmReactivation('bad')).rejects.toThrow(
-          BadRequestException,
+        BadRequestException,
       );
     });
   });
@@ -488,11 +479,11 @@ describe('AuthenticationService', () => {
       prismaMock.oAuthAccount.findUnique.mockResolvedValue(null);
 
       await expect(
-          service.validateOAuthLogin({
-            provider: 'google',
-            providerUserId: '123',
-            email: null,
-          }),
+        service.validateOAuthLogin({
+          provider: 'google',
+          providerUserId: '123',
+          email: null,
+        }),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -509,11 +500,11 @@ describe('AuthenticationService', () => {
       prismaMock.loginSession.updateMany.mockResolvedValue({});
 
       const res = await service.logout(
-          {
-            user: { sub: 'user1' },
-            cookies: { refresh_token: 'token' },
-          },
-          { clearCookie: jest.fn() } as any,
+        {
+          user: { sub: 'user1' },
+          cookies: { refresh_token: 'token' },
+        },
+        { clearCookie: jest.fn() } as any,
       );
 
       expect(res.message).toBeDefined();
@@ -558,8 +549,8 @@ describe('AuthenticationService', () => {
 
     (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-    await expect(
-        service.confirmReactivation('token'),
-    ).rejects.toThrow(BadRequestException);
+    await expect(service.confirmReactivation('token')).rejects.toThrow(
+      BadRequestException,
+    );
   });
 });

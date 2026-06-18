@@ -56,11 +56,11 @@ describe('SeatTemplateController', () => {
       const dto = {} as any;
 
       mockService.generateBulk.mockRejectedValue(
-          new BadRequestException('Invalid template data'),
+        new BadRequestException('Invalid template data'),
       );
 
       await expect(controller.generate(dto)).rejects.toThrow(
-          BadRequestException,
+        BadRequestException,
       );
     });
 
@@ -68,21 +68,18 @@ describe('SeatTemplateController', () => {
       const dto = { templateId: '1' } as any;
 
       mockService.generateBulk.mockRejectedValue(
-          new InternalServerErrorException(),
+        new InternalServerErrorException(),
       );
 
       await expect(controller.generate(dto)).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
 
   describe('findAll', () => {
     it('should return all template seats', async () => {
-      const result = [
-        { id: '1' },
-        { id: '2' },
-      ];
+      const result = [{ id: '1' }, { id: '2' }];
 
       mockService.findAll.mockResolvedValue(result);
 
@@ -90,12 +87,10 @@ describe('SeatTemplateController', () => {
     });
 
     it('should throw InternalServerErrorException', async () => {
-      mockService.findAll.mockRejectedValue(
-          new InternalServerErrorException(),
-      );
+      mockService.findAll.mockRejectedValue(new InternalServerErrorException());
 
       await expect(controller.findAll()).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
@@ -114,21 +109,21 @@ describe('SeatTemplateController', () => {
 
     it('should throw NotFoundException', async () => {
       mockService.findByTemplate.mockRejectedValue(
-          new NotFoundException('Template not found'),
+        new NotFoundException('Template not found'),
       );
 
       await expect(controller.findByTemplate('999')).rejects.toThrow(
-          NotFoundException,
+        NotFoundException,
       );
     });
 
     it('should handle empty templateId', async () => {
       mockService.findByTemplate.mockRejectedValue(
-          new BadRequestException('templateId is required'),
+        new BadRequestException('templateId is required'),
       );
 
       await expect(controller.findByTemplate('')).rejects.toThrow(
-          BadRequestException,
+        BadRequestException,
       );
     });
   });
@@ -144,31 +139,27 @@ describe('SeatTemplateController', () => {
 
     it('should throw NotFoundException', async () => {
       mockService.findOne.mockRejectedValue(
-          new NotFoundException('Seat not found'),
+        new NotFoundException('Seat not found'),
       );
 
       await expect(controller.findOne('999')).rejects.toThrow(
-          NotFoundException,
+        NotFoundException,
       );
     });
 
     it('should throw BadRequestException for empty id', async () => {
       mockService.findOne.mockRejectedValue(
-          new BadRequestException('ID is required'),
+        new BadRequestException('ID is required'),
       );
 
-      await expect(controller.findOne('')).rejects.toThrow(
-          BadRequestException,
-      );
+      await expect(controller.findOne('')).rejects.toThrow(BadRequestException);
     });
 
     it('should throw InternalServerErrorException', async () => {
-      mockService.findOne.mockRejectedValue(
-          new InternalServerErrorException(),
-      );
+      mockService.findOne.mockRejectedValue(new InternalServerErrorException());
 
       await expect(controller.findOne('1')).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });

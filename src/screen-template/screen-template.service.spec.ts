@@ -5,7 +5,7 @@ import {
   NotFoundException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import {ScreenType} from "@prisma/client";
+import { ScreenType } from '@prisma/client';
 
 describe('ScreenTemplateService', () => {
   let service: ScreenTemplateService;
@@ -50,7 +50,6 @@ describe('ScreenTemplateService', () => {
       jest.clearAllMocks();
     });
 
-
     it('should create template successfully', async () => {
       mockPrisma.screenTemplate.create.mockResolvedValue({
         id: '1',
@@ -67,14 +66,13 @@ describe('ScreenTemplateService', () => {
       });
 
       expect(mockLogger.log).toHaveBeenCalledWith(
-          'Creating screen template: IMAX',
+        'Creating screen template: IMAX',
       );
 
       expect(mockPrisma.screenTemplate.create).toHaveBeenCalledWith({
         data: dto,
       });
     });
-
 
     it('should not mutate input dto', async () => {
       const originalDto = {
@@ -95,7 +93,6 @@ describe('ScreenTemplateService', () => {
       });
     });
 
-
     it('should handle empty name', async () => {
       const badDto = { name: '', type: 'STANDARD' } as any;
 
@@ -107,12 +104,10 @@ describe('ScreenTemplateService', () => {
       const result = await service.create(badDto);
 
       expect(result.name).toBe('');
-      expect(mockLogger.log).toHaveBeenCalledWith(
-          'Creating screen template: ',
-      );
+      expect(mockLogger.log).toHaveBeenCalledWith('Creating screen template: ');
     });
 
-    it('should handle missing type field', async () => {
+    it('should handle missing types field', async () => {
       const badDto = { name: 'IMAX' } as any;
 
       mockPrisma.screenTemplate.create.mockResolvedValue({
@@ -125,7 +120,6 @@ describe('ScreenTemplateService', () => {
       expect(result.name).toBe('IMAX');
     });
 
-
     it('should handle prisma returning partial object', async () => {
       mockPrisma.screenTemplate.create.mockResolvedValue({
         id: '1',
@@ -136,12 +130,11 @@ describe('ScreenTemplateService', () => {
       expect(result).toEqual({ id: '1' });
     });
 
-
     it('should handle string thrown error', async () => {
       mockPrisma.screenTemplate.create.mockRejectedValue('DB crashed');
 
       await expect(service.create(dto)).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
 
       expect(mockLogger.error).toHaveBeenCalled();
@@ -151,7 +144,7 @@ describe('ScreenTemplateService', () => {
       mockPrisma.screenTemplate.create.mockRejectedValue(null);
 
       await expect(service.create(dto)).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
 
@@ -159,7 +152,7 @@ describe('ScreenTemplateService', () => {
       mockPrisma.screenTemplate.create.mockRejectedValue(500);
 
       await expect(service.create(dto)).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
 
@@ -218,16 +211,13 @@ describe('ScreenTemplateService', () => {
     });
 
     it('should throw InternalServerErrorException on prisma failure', async () => {
-      mockPrisma.screenTemplate.findMany.mockRejectedValue(
-          new Error('fail'),
-      );
+      mockPrisma.screenTemplate.findMany.mockRejectedValue(new Error('fail'));
 
       await expect(service.findAll()).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
-
 
   describe('findOne', () => {
     it('should return template', async () => {
@@ -247,9 +237,7 @@ describe('ScreenTemplateService', () => {
     it('should throw NotFoundException when not found', async () => {
       mockPrisma.screenTemplate.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOne('1')).rejects.toThrow(
-          NotFoundException,
-      );
+      await expect(service.findOne('1')).rejects.toThrow(NotFoundException);
     });
 
     it('should propagate NotFoundException unchanged', async () => {
@@ -265,11 +253,11 @@ describe('ScreenTemplateService', () => {
 
     it('should throw InternalServerErrorException on prisma crash', async () => {
       mockPrisma.screenTemplate.findUnique.mockRejectedValue(
-          new Error('DB crash'),
+        new Error('DB crash'),
       );
 
       await expect(service.findOne('1')).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
@@ -283,8 +271,8 @@ describe('ScreenTemplateService', () => {
 
     it('should call findOne with correct id', async () => {
       const findSpy = jest
-          .spyOn(service, 'findOne')
-          .mockResolvedValue({ id: '1' } as any);
+        .spyOn(service, 'findOne')
+        .mockResolvedValue({ id: '1' } as any);
 
       mockPrisma.screenTemplate.update.mockResolvedValue({
         id: '1',
@@ -297,9 +285,7 @@ describe('ScreenTemplateService', () => {
     });
 
     it('should pass correct data to prisma update', async () => {
-      jest
-          .spyOn(service, 'findOne')
-          .mockResolvedValue({ id: '1' } as any);
+      jest.spyOn(service, 'findOne').mockResolvedValue({ id: '1' } as any);
 
       await service.update('1', dto);
 
@@ -312,21 +298,15 @@ describe('ScreenTemplateService', () => {
     it('should NOT call prisma update if findOne throws NotFoundException', async () => {
       const updateSpy = mockPrisma.screenTemplate.update;
 
-      jest
-          .spyOn(service, 'findOne')
-          .mockRejectedValue(new NotFoundException());
+      jest.spyOn(service, 'findOne').mockRejectedValue(new NotFoundException());
 
-      await expect(service.update('1', dto)).rejects.toThrow(
-          NotFoundException,
-      );
+      await expect(service.update('1', dto)).rejects.toThrow(NotFoundException);
 
       expect(updateSpy).not.toHaveBeenCalled();
     });
 
     it('should handle prisma returning minimal object', async () => {
-      jest
-          .spyOn(service, 'findOne')
-          .mockResolvedValue({ id: '1' } as any);
+      jest.spyOn(service, 'findOne').mockResolvedValue({ id: '1' } as any);
 
       mockPrisma.screenTemplate.update.mockResolvedValue({
         id: '1',
@@ -338,40 +318,32 @@ describe('ScreenTemplateService', () => {
     });
 
     it('should handle string error thrown by prisma', async () => {
-      jest
-          .spyOn(service, 'findOne')
-          .mockResolvedValue({ id: '1' } as any);
+      jest.spyOn(service, 'findOne').mockResolvedValue({ id: '1' } as any);
 
       mockPrisma.screenTemplate.update.mockRejectedValue('DB crash');
 
       await expect(service.update('1', dto)).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
 
       expect(mockLogger.error).toHaveBeenCalled();
     });
 
     it('should log correct error message with id', async () => {
-      jest
-          .spyOn(service, 'findOne')
-          .mockResolvedValue({ id: '1' } as any);
+      jest.spyOn(service, 'findOne').mockResolvedValue({ id: '1' } as any);
 
-      mockPrisma.screenTemplate.update.mockRejectedValue(
-          new Error('fail'),
-      );
+      mockPrisma.screenTemplate.update.mockRejectedValue(new Error('fail'));
 
       await service.update('1', dto).catch(() => {});
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-          expect.stringContaining('Update template 1 failed'),
-          expect.anything(),
+        expect.stringContaining('Update template 1 failed'),
+        expect.anything(),
       );
     });
 
     it('should only call update once', async () => {
-      jest
-          .spyOn(service, 'findOne')
-          .mockResolvedValue({ id: '1' } as any);
+      jest.spyOn(service, 'findOne').mockResolvedValue({ id: '1' } as any);
 
       mockPrisma.screenTemplate.update.mockResolvedValue({
         id: '1',
@@ -384,7 +356,6 @@ describe('ScreenTemplateService', () => {
     });
   });
 
-
   describe('remove (extended)', () => {
     beforeEach(() => {
       jest.clearAllMocks();
@@ -393,12 +364,10 @@ describe('ScreenTemplateService', () => {
     it('should call findOne before delete', async () => {
       const callOrder: string[] = [];
 
-      jest
-          .spyOn(service, 'findOne')
-          .mockImplementation(async () => {
-            callOrder.push('findOne');
-            return { id: '1' } as any;
-          });
+      jest.spyOn(service, 'findOne').mockImplementation(async () => {
+        callOrder.push('findOne');
+        return { id: '1' } as any;
+      });
 
       mockPrisma.screenTemplate.delete.mockImplementation(async () => {
         callOrder.push('delete');
@@ -411,9 +380,7 @@ describe('ScreenTemplateService', () => {
     });
 
     it('should call prisma delete with correct id', async () => {
-      jest
-          .spyOn(service, 'findOne')
-          .mockResolvedValue({ id: '1' } as any);
+      jest.spyOn(service, 'findOne').mockResolvedValue({ id: '1' } as any);
 
       await service.remove('1');
 
@@ -425,21 +392,15 @@ describe('ScreenTemplateService', () => {
     it('should NOT call delete if findOne throws', async () => {
       const deleteSpy = mockPrisma.screenTemplate.delete;
 
-      jest
-          .spyOn(service, 'findOne')
-          .mockRejectedValue(new NotFoundException());
+      jest.spyOn(service, 'findOne').mockRejectedValue(new NotFoundException());
 
-      await expect(service.remove('1')).rejects.toThrow(
-          NotFoundException,
-      );
+      await expect(service.remove('1')).rejects.toThrow(NotFoundException);
 
       expect(deleteSpy).not.toHaveBeenCalled();
     });
 
     it('should handle prisma returning null-like response', async () => {
-      jest
-          .spyOn(service, 'findOne')
-          .mockResolvedValue({ id: '1' } as any);
+      jest.spyOn(service, 'findOne').mockResolvedValue({ id: '1' } as any);
 
       mockPrisma.screenTemplate.delete.mockResolvedValue(null as any);
 
@@ -449,38 +410,30 @@ describe('ScreenTemplateService', () => {
     });
 
     it('should handle string thrown error', async () => {
-      jest
-          .spyOn(service, 'findOne')
-          .mockResolvedValue({ id: '1' } as any);
+      jest.spyOn(service, 'findOne').mockResolvedValue({ id: '1' } as any);
 
       mockPrisma.screenTemplate.delete.mockRejectedValue('DB error');
 
       await expect(service.remove('1')).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
 
     it('should log delete error with correct id', async () => {
-      jest
-          .spyOn(service, 'findOne')
-          .mockResolvedValue({ id: '1' } as any);
+      jest.spyOn(service, 'findOne').mockResolvedValue({ id: '1' } as any);
 
-      mockPrisma.screenTemplate.delete.mockRejectedValue(
-          new Error('fail'),
-      );
+      mockPrisma.screenTemplate.delete.mockRejectedValue(new Error('fail'));
 
       await service.remove('1').catch(() => {});
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-          expect.stringContaining('Delete template 1 failed'),
-          expect.anything(),
+        expect.stringContaining('Delete template 1 failed'),
+        expect.anything(),
       );
     });
 
     it('should only call delete once', async () => {
-      jest
-          .spyOn(service, 'findOne')
-          .mockResolvedValue({ id: '1' } as any);
+      jest.spyOn(service, 'findOne').mockResolvedValue({ id: '1' } as any);
 
       mockPrisma.screenTemplate.delete.mockResolvedValue({ id: '1' });
 

@@ -1,11 +1,11 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { FileUploadService } from "./file-upload.service";
-import { PrismaService } from "../prisma/prisma.service";
-import { CloudinaryService } from "./cloudinary/cloudinary.service";
-import { Logger } from "@nestjs/common";
-import {UploadFolder} from "./dto/upload-file.dto";
+import { Test, TestingModule } from '@nestjs/testing';
+import { FileUploadService } from './file-upload.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { CloudinaryService } from './cloudinary/cloudinary.service';
+import { Logger } from '@nestjs/common';
+import { UploadFolder } from './dto/upload-file.dto';
 
-describe("FileUploadService", () => {
+describe('FileUploadService', () => {
   let service: FileUploadService;
 
   const mockCloudinaryService = {
@@ -34,164 +34,162 @@ describe("FileUploadService", () => {
 
     jest.clearAllMocks();
 
-    jest.spyOn(Logger.prototype, "log").mockImplementation(() => {});
-    jest.spyOn(Logger.prototype, "error").mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
   });
 
-  it("should upload file successfully", async () => {
+  it('should upload file successfully', async () => {
     const file = {
-      originalname: "test.png",
-      mimetype: "image/png",
+      originalname: 'test.png',
+      mimetype: 'image/png',
       size: 100,
     } as Express.Multer.File;
 
     const dto = {
       folder: UploadFolder.AVATARS,
-      description: "profile",
+      description: 'profile',
     };
 
     mockCloudinaryService.uploadFile.mockResolvedValue({
-      secure_url: "http://cloudinary.com/test.png",
-      public_id: "abc123",
+      secure_url: 'http://cloudinary.com/test.png',
+      public_id: 'abc123',
     });
 
     mockPrismaService.file.create.mockResolvedValue({
-      id: "file-id",
+      id: 'file-id',
     });
 
-    const result = await service.uploadFile(file, dto, "user-1");
+    const result = await service.uploadFile(file, dto, 'user-1');
 
-    expect(result.id).toBe("file-id");
+    expect(result.id).toBe('file-id');
     expect(mockCloudinaryService.uploadFile).toHaveBeenCalled();
     expect(mockPrismaService.file.create).toHaveBeenCalled();
   });
 
-  it("should throw error when cloudinary upload fails", async () => {
+  it('should throw error when cloudinary upload fails', async () => {
     const file = {
-      originalname: "test.png",
-      mimetype: "image/png",
+      originalname: 'test.png',
+      mimetype: 'image/png',
       size: 100,
     } as Express.Multer.File;
 
     const dto = {
       folder: UploadFolder.AVATARS,
-      description: "profile",
+      description: 'profile',
     };
 
     mockCloudinaryService.uploadFile.mockRejectedValue(
-        new Error("Cloudinary failed"),
+      new Error('Cloudinary failed'),
     );
 
-    await expect(service.uploadFile(file, dto, "user-1")).rejects.toThrow(
-        "Cloudinary failed",
+    await expect(service.uploadFile(file, dto, 'user-1')).rejects.toThrow(
+      'Cloudinary failed',
     );
   });
 
-  it("should throw error when prisma create fails", async () => {
+  it('should throw error when prisma create fails', async () => {
     const file = {
-      originalname: "test.png",
-      mimetype: "image/png",
+      originalname: 'test.png',
+      mimetype: 'image/png',
       size: 100,
     } as Express.Multer.File;
 
     const dto = {
       folder: UploadFolder.AVATARS,
-      description: "profile",
+      description: 'profile',
     };
 
     mockCloudinaryService.uploadFile.mockResolvedValue({
-      secure_url: "url",
-      public_id: "id",
+      secure_url: 'url',
+      public_id: 'id',
     });
 
-    mockPrismaService.file.create.mockRejectedValue(
-        new Error("DB failed"),
-    );
+    mockPrismaService.file.create.mockRejectedValue(new Error('DB failed'));
 
-    await expect(service.uploadFile(file, dto, "user-1")).rejects.toThrow(
-        "DB failed",
+    await expect(service.uploadFile(file, dto, 'user-1')).rejects.toThrow(
+      'DB failed',
     );
   });
 
-  it("should delete file if owner", async () => {
+  it('should delete file if owner', async () => {
     mockPrismaService.file.findUnique.mockResolvedValue({
-      id: "file-1",
-      uploaderId: "user-1",
-      publicId: "cloud-1",
+      id: 'file-1',
+      uploaderId: 'user-1',
+      publicId: 'cloud-1',
     });
 
     mockCloudinaryService.deleteFile.mockResolvedValue({});
 
     mockPrismaService.file.delete.mockResolvedValue({});
 
-    const result = await service.deleteFile("file-1", {
-      id: "user-1",
-      role: "USER",
+    const result = await service.deleteFile('file-1', {
+      id: 'user-1',
+      role: 'USER',
     });
 
     expect(result.success).toBe(true);
   });
 
-  it("should delete file if admin", async () => {
+  it('should delete file if admin', async () => {
     mockPrismaService.file.findUnique.mockResolvedValue({
-      id: "file-1",
-      uploaderId: "user-2",
-      publicId: "cloud-1",
+      id: 'file-1',
+      uploaderId: 'user-2',
+      publicId: 'cloud-1',
     });
 
     mockCloudinaryService.deleteFile.mockResolvedValue({});
     mockPrismaService.file.delete.mockResolvedValue({});
 
-    const result = await service.deleteFile("file-1", {
-      id: "admin-1",
-      role: "ADMIN",
+    const result = await service.deleteFile('file-1', {
+      id: 'admin-1',
+      role: 'ADMIN',
     });
 
     expect(result.success).toBe(true);
   });
 
-  it("should throw NotFoundException when file not found", async () => {
+  it('should throw NotFoundException when file not found', async () => {
     mockPrismaService.file.findUnique.mockResolvedValue(null);
 
     await expect(
-        service.deleteFile("missing", {
-          id: "user-1",
-          role: "USER",
-        }),
-    ).rejects.toThrow("File not found");
+      service.deleteFile('missing', {
+        id: 'user-1',
+        role: 'USER',
+      }),
+    ).rejects.toThrow('File not found');
   });
 
-  it("should throw ForbiddenException when not owner or admin", async () => {
+  it('should throw ForbiddenException when not owner or admin', async () => {
     mockPrismaService.file.findUnique.mockResolvedValue({
-      id: "file-1",
-      uploaderId: "user-2",
-      publicId: "cloud-1",
+      id: 'file-1',
+      uploaderId: 'user-2',
+      publicId: 'cloud-1',
     });
 
     await expect(
-        service.deleteFile("file-1", {
-          id: "user-1",
-          role: "USER",
-        }),
-    ).rejects.toThrow("You are not allowed to delete this file");
+      service.deleteFile('file-1', {
+        id: 'user-1',
+        role: 'USER',
+      }),
+    ).rejects.toThrow('You are not allowed to delete this file');
   });
 
-  it("should throw error when cloudinary delete fails", async () => {
+  it('should throw error when cloudinary delete fails', async () => {
     mockPrismaService.file.findUnique.mockResolvedValue({
-      id: "file-1",
-      uploaderId: "user-1",
-      publicId: "cloud-1",
+      id: 'file-1',
+      uploaderId: 'user-1',
+      publicId: 'cloud-1',
     });
 
     mockCloudinaryService.deleteFile.mockRejectedValue(
-        new Error("Cloudinary delete failed"),
+      new Error('Cloudinary delete failed'),
     );
 
     await expect(
-        service.deleteFile("file-1", {
-          id: "user-1",
-          role: "USER",
-        }),
-    ).rejects.toThrow("Cloudinary delete failed");
+      service.deleteFile('file-1', {
+        id: 'user-1',
+        role: 'USER',
+      }),
+    ).rejects.toThrow('Cloudinary delete failed');
   });
 });

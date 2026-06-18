@@ -1,194 +1,410 @@
 import {
-    Injectable,
-    Logger,
-    NotFoundException,
-    BadRequestException,
-    InternalServerErrorException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSeatLockDto } from './dto/create-seat-lock.dto';
+import {Prisma} from "@prisma/client";
+import {Cron} from "@nestjs/schedule";
 
 @Injectable()
 export class SeatService {
-    private readonly logger = new Logger(SeatService.name);
+  private readonly logger = new Logger(SeatService.name);
 
-    constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-    async getSeatsByScreen(screenId: string) {
-        try {
-            return await this.prisma.seat.findMany({
-                where: { screenId },
-                orderBy: [{ seatRow: 'asc' }, { seatNumber: 'asc' }],
-            });
-        } catch (error) {
-            this.logger.error(
-                'Failed to fetch seats',
-                error instanceof Error ? error.stack : String(error),
-            );
-            throw new InternalServerErrorException();
-        }
+  async getSeatsByScreen(screenId: string) {
+    try {
+      return await this.prisma.seat.findMany({
+        where: { screenId },
+        orderBy: [{ seatRow: 'asc' }, { seatNumber: 'asc' }],
+      });
+    } catch (error) {
+      this.logger.error(
+        'Failed to fetch seats',
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new InternalServerErrorException();
+    }
+  }
+
+  async getSeatMap(showtimeId: string) {
+    const now = new Date();
+
+    const [showtime, pricingRules] = await Promise.all([
+      this.prisma.showtime.findUnique({
+        where: { id: showtimeId },
+        include: {
+          screen: {
+            include: {
+              seats: true,
+            },
+          },
+          seatLocks: {
+            where: {
+              expiresAt: {
+                gt: now,
+              },
+            },
+          },
+          bookingSeats: true,
+        },
+      }),
+
+      this.prisma.seatPricingRule.findMany({
+        where: {
+          isActive: true,
+        },
+      }),
+    ]);
+
+    if (!showtime) {
+      throw new NotFoundException('Showtime not found');
     }
 
-    async getSeatMap(showtimeId: string) {
-        try {
-            const showtime = await this.prisma.showtime.findUnique({
-                where: { id: showtimeId },
+    const pricingMap = Object.fromEntries(
+        pricingRules.map((rule) => [
+          rule.seatType,
+          Number(rule.seatSurcharge),
+        ]),
+    );
+
+    const lockedSeatIds = new Set(
+        showtime.seatLocks.map((lock) => lock.seatId),
+    );
+
+    const bookedSeatIds = new Set(
+        showtime.bookingSeats.map((seat) => seat.seatId),
+    );
+
+    return showtime.screen.seats.map((seat) => {
+      let status: 'AVAILABLE' | 'LOCKED' | 'BOOKED' =
+          'AVAILABLE';
+
+      if (bookedSeatIds.has(seat.id)) {
+        status = 'BOOKED';
+      } else if (lockedSeatIds.has(seat.id)) {
+        status = 'LOCKED';
+      }
+
+      return {
+        id: seat.id,
+        seatRow: seat.seatRow,
+        seatNumber: seat.seatNumber,
+        posX: seat.posX,
+        posY: seat.posY,
+        seatType: seat.seatType,
+        status,
+        surcharge:
+            pricingMap[seat.seatType] ?? 0,
+      };
+    });
+  }
+
+  //add to cart
+  async lockSeat(accountId: string, dto: CreateSeatLockDto) {
+      try {
+        const result = await this.prisma.$transaction(async (tx) => {
+          const [seat, showtime] = await Promise.all([
+            tx.seat.findUnique({
+              where: { id: dto.seatId },
+            }),
+            tx.showtime.findUnique({
+              where: { id: dto.showtimeId },
+            }),
+          ]);
+
+          if (!seat) {
+            throw new NotFoundException('Seat not found');
+          }
+
+          if (!showtime) {
+            throw new NotFoundException('Showtime not found');
+          }
+
+          const now = new Date();
+
+          // Remove expired lock if exists
+          await tx.seatLock.deleteMany({
+            where: {
+              seatId: dto.seatId,
+              showtimeId: dto.showtimeId,
+              expiresAt: {
+                lte: now,
+              },
+            },
+          });
+
+          // Check if seat already booked
+          const bookedSeat = await tx.bookingSeat.findFirst({
+            where: {
+              seatId: dto.seatId,
+              showtimeId: dto.showtimeId,
+            },
+          });
+
+          if (bookedSeat) {
+            throw new BadRequestException('Seat already booked');
+          }
+
+          // Check active lock
+          const activeLock = await tx.seatLock.findUnique({
+            where: {
+              showtimeId_seatId: {
+                showtimeId: dto.showtimeId,
+                seatId: dto.seatId,
+              },
+            },
+          });
+
+          if (activeLock) {
+            if (activeLock.accountId === accountId) {
+              return {
+                message: 'Seat already locked by you',
+                lock: activeLock,
+              };
+            }
+
+            throw new BadRequestException('Seat already locked');
+          }
+
+          // Optional seat limit
+          const currentLockCount = await tx.seatLock.count({
+            where: {
+              accountId,
+              showtimeId: dto.showtimeId,
+              expiresAt: {
+                gt: now,
+              },
+            },
+          });
+
+          if (currentLockCount >= 10) {
+            throw new BadRequestException(
+                'Maximum 10 seats allowed per booking',
+            );
+          }
+
+          //Time Countdown
+          const expiresAt = new Date(now.getTime() + 5 * 60 * 1000);
+
+          const lock = await tx.seatLock.create({
+            data: {
+              accountId,
+              seatId: dto.seatId,
+              showtimeId: dto.showtimeId,
+              expiresAt,
+            },
+          });
+
+          return {
+            message: 'Seat locked successfully',
+            lock,
+          };
+        });
+
+        return result;
+      } catch (error) {
+        this.logger.error(
+            'Seat lock failed',
+            error instanceof Error ? error.stack : String(error),
+        );
+
+        if (
+            error instanceof NotFoundException ||
+            error instanceof BadRequestException
+        ) {
+          throw error;
+        }
+
+        // Handle race condition
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          throw new BadRequestException('Seat already locked');
+        }
+
+        throw new InternalServerErrorException();
+      }
+  }
+
+  async getMyLockedSeats(accountId: string) {
+    const now = new Date();
+
+    const [locks, pricingRules] = await Promise.all([
+      this.prisma.seatLock.findMany({
+        where: {
+          accountId,
+          expiresAt: { gt: now },
+        },
+        include: {
+          account: {
+            include: {
+              profile: true,
+            },
+          },
+          seat: true,
+          showtime: {
+            include: {
+              movie: true,
+              screen: {
                 include: {
-                    screen: { include: { seats: true } },
-                    seatLocks: true,
-                    bookingSeats: true,
+                  theater: true,
+                  template: true,
                 },
-            });
+              },
+            },
+          },
+        },
+      }),
 
-            if (!showtime) {
-                throw new NotFoundException('Showtime not found');
-            }
+      this.prisma.seatPricingRule.findMany({
+        where: { isActive: true },
+      }),
+    ]);
 
-            const now = new Date();
+    // seat surcharge map
+    const pricingMap = Object.fromEntries(
+        pricingRules.map((rule) => [
+          rule.seatType,
+          Number(rule.seatSurcharge),
+        ]),
+    );
 
-            const activeLocks = showtime.seatLocks.filter(
-                (l) => l.expiresAt > now,
-            );
-
-            const lockedSeatIds = new Set(activeLocks.map((l) => l.seatId));
-            const bookedSeatIds = new Set(
-                showtime.bookingSeats.map((b) => b.seatId),
-            );
-
-            return showtime.screen.seats.map((seat) => ({
-                ...seat,
-                isLocked: lockedSeatIds.has(seat.id),
-                isBooked: bookedSeatIds.has(seat.id),
-            }));
-
-        } catch (error) {
-            this.logger.error('Failed to get seat map', error instanceof Error ? error.stack : String(error));
-            if (
-                error instanceof NotFoundException ||
-                error instanceof BadRequestException
-            ) {
-                throw error;
-            }
-
-            throw new InternalServerErrorException();
-        }
+    if (locks.length === 0) {
+      return {
+        user: accountId,
+        items: [],
+        summary: {
+          itemCount: 0,
+          totalAmount: 0,
+        },
+      };
     }
 
-    //add to cart
-    async lockSeat(accountId: string, dto: CreateSeatLockDto) {
-        try {
-            const seat = await this.prisma.seat.findUnique({
-                where: { id: dto.seatId },
-            });
+    const user = locks[0].account;
 
-            if (!seat) {
-                throw new NotFoundException('Seat not found');
+    let totalAmount = 0;
+
+    const items = locks.map((lock) => {
+      const basePrice = Number(lock.showtime.basePrice);
+
+      const screenSurcharge = Number(
+          lock.showtime.screen.template.screenSurcharge,
+      );
+
+      const seatSurcharge =
+          pricingMap[lock.seat.seatType] ?? 0;
+
+      const total = basePrice + screenSurcharge + seatSurcharge;
+
+      totalAmount += total;
+
+      return {
+        lockId: lock.id,
+        expiresAt: lock.expiresAt,
+
+        movie: {
+          id: lock.showtime.movie.id,
+          title: lock.showtime.movie.title,
+        },
+
+        theater: {
+          id: lock.showtime.screen.theater.id,
+          name: lock.showtime.screen.theater.name,
+        },
+
+        screen: {
+          id: lock.showtime.screen.id,
+          name: lock.showtime.screen.name,
+        },
+
+        seat: {
+          id: lock.seat.id,
+          row: lock.seat.seatRow,
+          number: lock.seat.seatNumber,
+          type: lock.seat.seatType,
+        },
+
+        pricing: {
+          basePrice,
+          screenSurcharge,
+          seatSurcharge,
+          total,
+        },
+      };
+    });
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        profile: user.profile
+            ? {
+              firstName: user.profile.firstName,
+              lastName: user.profile.lastName,
+              phone: user.profile.phone,
             }
+            : null,
+      },
 
-            const showtime = await this.prisma.showtime.findUnique({
-                where: { id: dto.showtimeId },
-            });
+      items,
 
-            if (!showtime) {
-                throw new NotFoundException('Showtime not found');
-            }
+      summary: {
+        itemCount: items.length,
+        totalAmount,
+      },
+    };
+  }
 
-            const now = new Date();
+  //remove seat from SeatLock(Cart)
+  async unlockSeat(accountId: string, seatId: string, showtimeId: string,) {
+    const lock = await this.prisma.seatLock.findUnique({
+      where: {
+        showtimeId_seatId: {
+          showtimeId,
+          seatId,
+        },
+      },
+    });
 
-            // check existing lock (not expired)
-            const existingLock = await this.prisma.seatLock.findUnique({
-                where: {
-                    showtimeId_seatId: {
-                        showtimeId: dto.showtimeId,
-                        seatId: dto.seatId,
-                    },
-                },
-            });
-
-            if (existingLock && existingLock.expiresAt > now) {
-                throw new BadRequestException('Seat already locked');
-            }
-
-            //create lock (5 minutes)
-            const expiresAt = new Date(now.getTime() + 5 * 60 * 1000);
-
-            const lock = await this.prisma.seatLock.create({
-                data: {
-                    accountId,
-                    seatId: dto.seatId,
-                    showtimeId: dto.showtimeId,
-                    expiresAt,
-                },
-            });
-
-            return {
-                message: 'Seat locked successfully',
-                lock,
-            };
-        } catch (error) {
-            this.logger.error('Seat lock failed', error.stack);
-
-            if (
-                error instanceof NotFoundException ||
-                error instanceof BadRequestException
-            ) {
-                throw error;
-            }
-
-            throw new InternalServerErrorException();
-        }
+    if (!lock) {
+      throw new NotFoundException('Lock not found');
     }
 
-    async unlockSeat(accountId: string, seatId: string, showtimeId: string) {
-        try {
-            const lock = await this.prisma.seatLock.findUnique({
-                where: {
-                    showtimeId_seatId: { showtimeId, seatId },
-                },
-            });
-
-            if (!lock) {
-                throw new NotFoundException('Lock not found');
-            }
-
-            if (lock.accountId !== accountId) {
-                throw new BadRequestException('Not your seat lock');
-            }
-
-            await this.prisma.seatLock.delete({
-                where: { id: lock.id },
-            });
-
-            return { message: 'Seat unlocked' };
-        } catch (error) {
-            this.logger.error('Unlock seat failed', error.stack);
-
-            if (
-                error instanceof NotFoundException ||
-                error instanceof BadRequestException
-            ) {
-                throw error;
-            }
-
-            throw new InternalServerErrorException();
-        }
+    if (lock.accountId !== accountId) {
+      throw new BadRequestException(
+          'You do not own this seat lock',
+      );
     }
 
-    async cleanupExpiredLocks() {
-        try {
-            const result = await this.prisma.seatLock.deleteMany({
-                where: {
-                    expiresAt: { lt: new Date() },
-                },
-            });
+    await this.prisma.seatLock.delete({
+      where: {
+        id: lock.id,
+      },
+    });
 
-            this.logger.log(`Cleaned ${result.count} expired locks`);
+    return {
+      message: 'Seat unlocked successfully',
+    };
+  }
 
-            return result;
-        } catch (error) {
-            this.logger.error('Cleanup failed', error instanceof Error ? error.stack : String(error));
+  @Cron('*/30 * * * * *')
+  async cleanupExpiredLocks() {
+    const result = await this.prisma.seatLock.deleteMany({
+      where: {
+        expiresAt: {
+          lt: new Date(),
+        },
+      },
+    });
 
-            throw new InternalServerErrorException('Failed to cleanup expired locks');
-        }
+    if (result.count > 0) {
+      this.logger.log(
+          `Removed ${result.count} expired seat locks`,
+      );
     }
+  }
 }

@@ -55,23 +55,19 @@ describe('ScreenTemplateController', () => {
       const dto = {} as any;
 
       mockService.create.mockRejectedValue(
-          new BadRequestException('Invalid template data'),
+        new BadRequestException('Invalid template data'),
       );
 
-      await expect(controller.create(dto)).rejects.toThrow(
-          BadRequestException,
-      );
+      await expect(controller.create(dto)).rejects.toThrow(BadRequestException);
     });
 
     it('should throw InternalServerErrorException', async () => {
       const dto = { name: 'Template A' } as any;
 
-      mockService.create.mockRejectedValue(
-          new InternalServerErrorException(),
-      );
+      mockService.create.mockRejectedValue(new InternalServerErrorException());
 
       await expect(controller.create(dto)).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
@@ -89,12 +85,10 @@ describe('ScreenTemplateController', () => {
     });
 
     it('should throw InternalServerErrorException', async () => {
-      mockService.findAll.mockRejectedValue(
-          new InternalServerErrorException(),
-      );
+      mockService.findAll.mockRejectedValue(new InternalServerErrorException());
 
       await expect(controller.findAll()).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
@@ -110,22 +104,20 @@ describe('ScreenTemplateController', () => {
 
     it('should throw NotFoundException', async () => {
       mockService.findOne.mockRejectedValue(
-          new NotFoundException('Template not found'),
+        new NotFoundException('Template not found'),
       );
 
       await expect(controller.findOne('999')).rejects.toThrow(
-          NotFoundException,
+        NotFoundException,
       );
     });
 
     it('should handle empty id', async () => {
       mockService.findOne.mockRejectedValue(
-          new BadRequestException('ID is required'),
+        new BadRequestException('ID is required'),
       );
 
-      await expect(controller.findOne('')).rejects.toThrow(
-          BadRequestException,
-      );
+      await expect(controller.findOne('')).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -141,32 +133,30 @@ describe('ScreenTemplateController', () => {
 
     it('should throw NotFoundException', async () => {
       mockService.update.mockRejectedValue(
-          new NotFoundException('Template not found'),
+        new NotFoundException('Template not found'),
       );
 
-      await expect(
-          controller.update('999', {} as any),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.update('999', {} as any)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BadRequestException', async () => {
       mockService.update.mockRejectedValue(
-          new BadRequestException('Invalid update data'),
+        new BadRequestException('Invalid update data'),
       );
 
-      await expect(
-          controller.update('1', {} as any),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.update('1', {} as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw InternalServerErrorException', async () => {
-      mockService.update.mockRejectedValue(
-          new InternalServerErrorException(),
-      );
+      mockService.update.mockRejectedValue(new InternalServerErrorException());
 
-      await expect(
-          controller.update('1', {} as any),
-      ).rejects.toThrow(InternalServerErrorException);
+      await expect(controller.update('1', {} as any)).rejects.toThrow(
+        InternalServerErrorException,
+      );
     });
   });
 
@@ -183,31 +173,25 @@ describe('ScreenTemplateController', () => {
 
     it('should throw NotFoundException', async () => {
       mockService.remove.mockRejectedValue(
-          new NotFoundException('Template not found'),
+        new NotFoundException('Template not found'),
       );
 
-      await expect(controller.remove('999')).rejects.toThrow(
-          NotFoundException,
-      );
+      await expect(controller.remove('999')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BadRequestException', async () => {
       mockService.remove.mockRejectedValue(
-          new BadRequestException('Invalid ID'),
+        new BadRequestException('Invalid ID'),
       );
 
-      await expect(controller.remove('')).rejects.toThrow(
-          BadRequestException,
-      );
+      await expect(controller.remove('')).rejects.toThrow(BadRequestException);
     });
 
     it('should throw InternalServerErrorException', async () => {
-      mockService.remove.mockRejectedValue(
-          new InternalServerErrorException(),
-      );
+      mockService.remove.mockRejectedValue(new InternalServerErrorException());
 
       await expect(controller.remove('1')).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });

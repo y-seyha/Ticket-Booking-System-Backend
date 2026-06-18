@@ -26,15 +26,12 @@ describe('UserController', () => {
   beforeEach(async () => {
     const module = await Test.createTestingModule({
       controllers: [UserController],
-      providers: [
-        { provide: UserService, useValue: userServiceMock },
-      ],
+      providers: [{ provide: UserService, useValue: userServiceMock }],
     }).compile();
 
     controller = module.get(UserController);
     jest.clearAllMocks();
   });
-
 
   describe('GET /users/me', () => {
     it('should return current user profile', async () => {
@@ -50,13 +47,11 @@ describe('UserController', () => {
     });
 
     it('should propagate service error', async () => {
-      userServiceMock.getMyProfile.mockRejectedValue(
-          new Error('profile fail'),
-      );
+      userServiceMock.getMyProfile.mockRejectedValue(new Error('profile fail'));
 
-      await expect(
-          controller.getMyProfile(mockUser),
-      ).rejects.toThrow('profile fail');
+      await expect(controller.getMyProfile(mockUser)).rejects.toThrow(
+        'profile fail',
+      );
     });
   });
 
@@ -67,15 +62,15 @@ describe('UserController', () => {
       });
 
       const res = await controller.updateMyProfile(
-          mockUser,
-          { firstName: 'John' } as any,
-          undefined,
+        mockUser,
+        { firstName: 'John' },
+        undefined,
       );
 
       expect(userServiceMock.updateProfile).toHaveBeenCalledWith(
-          'user-1',
-          { firstName: 'John' },
-          undefined,
+        'user-1',
+        { firstName: 'John' },
+        undefined,
       );
 
       expect(res.firstName).toBe('John');
@@ -94,15 +89,15 @@ describe('UserController', () => {
       });
 
       const res = await controller.updateMyProfile(
-          mockUser,
-          { firstName: 'John' } as any,
-          mockFile,
+        mockUser,
+        { firstName: 'John' },
+        mockFile,
       );
 
       expect(userServiceMock.updateProfile).toHaveBeenCalledWith(
-          'user-1',
-          { firstName: 'John' },
-          mockFile,
+        'user-1',
+        { firstName: 'John' },
+        mockFile,
       );
 
       expect(res.avatarId).toBe('file-123');
@@ -110,12 +105,10 @@ describe('UserController', () => {
 
     describe('PATCH /users/:id/role', () => {
       it('should propagate invalid role error', async () => {
-        userServiceMock.changeRole.mockRejectedValue(
-            new Error('Invalid role'),
-        );
+        userServiceMock.changeRole.mockRejectedValue(new Error('Invalid role'));
 
         await expect(
-            controller.changeRole('3', 'INVALID' as any, mockUser),
+          controller.changeRole('3', 'INVALID' as any, mockUser),
         ).rejects.toThrow('Invalid role');
       });
     });
@@ -135,12 +128,11 @@ describe('UserController', () => {
     });
   });
 
-
   describe('GET /users', () => {
     it('should return users with default pagination', async () => {
       userServiceMock.getAllUsers.mockResolvedValue([{ id: '1' }]);
 
-      const res = await controller.getAllUsers(undefined as any, undefined as any);
+      const res = await controller.getAllUsers(undefined, undefined);
 
       expect(userServiceMock.getAllUsers).toHaveBeenCalledWith(1, 10);
       expect(res.length).toBe(1);
@@ -151,10 +143,7 @@ describe('UserController', () => {
 
       await controller.getAllUsers('10' as any, '20' as any);
 
-      expect(userServiceMock.getAllUsers).toHaveBeenCalledWith(
-          10,
-          20,
-      );
+      expect(userServiceMock.getAllUsers).toHaveBeenCalledWith(10, 20);
     });
 
     it('should parse pagination strings', async () => {
@@ -191,7 +180,6 @@ describe('UserController', () => {
     });
   });
 
-
   describe('PATCH /users/:id/ban', () => {
     it('should ban user', async () => {
       userServiceMock.banUser.mockResolvedValue({ id: '3' });
@@ -205,10 +193,11 @@ describe('UserController', () => {
     it('should propagate error', async () => {
       userServiceMock.banUser.mockRejectedValue(new Error('ban fail'));
 
-      await expect(controller.banUser('3', mockUser)).rejects.toThrow('ban fail');
+      await expect(controller.banUser('3', mockUser)).rejects.toThrow(
+        'ban fail',
+      );
     });
   });
-
 
   describe('PATCH /users/:id/unban', () => {
     it('should unban user', async () => {
@@ -223,7 +212,6 @@ describe('UserController', () => {
     });
   });
 
-
   describe('PATCH /users/:id/role', () => {
     it('should change role', async () => {
       userServiceMock.changeRole.mockResolvedValue({
@@ -234,9 +222,9 @@ describe('UserController', () => {
       const res = await controller.changeRole('3', Role.ADMIN, mockUser);
 
       expect(userServiceMock.changeRole).toHaveBeenCalledWith(
-          '3',
-          Role.ADMIN,
-          'user-1',
+        '3',
+        Role.ADMIN,
+        'user-1',
       );
 
       expect(res.role).toBe(Role.ADMIN);
@@ -246,11 +234,10 @@ describe('UserController', () => {
       userServiceMock.changeRole.mockRejectedValue(new Error('role fail'));
 
       await expect(
-          controller.changeRole('3', Role.ADMIN, mockUser),
+        controller.changeRole('3', Role.ADMIN, mockUser),
       ).rejects.toThrow('role fail');
     });
   });
-
 
   describe('DELETE /users/:id', () => {
     it('should delete user (soft delete)', async () => {
@@ -261,10 +248,7 @@ describe('UserController', () => {
 
       const res = await controller.deleteUser('4', mockUser);
 
-      expect(userServiceMock.deleteUser).toHaveBeenCalledWith(
-          '4',
-          'user-1',
-      );
+      expect(userServiceMock.deleteUser).toHaveBeenCalledWith('4', 'user-1');
 
       expect(res.status).toBe('DELETED');
     });
@@ -272,9 +256,9 @@ describe('UserController', () => {
     it('should propagate delete error', async () => {
       userServiceMock.deleteUser.mockRejectedValue(new Error('delete fail'));
 
-      await expect(
-          controller.deleteUser('4', mockUser),
-      ).rejects.toThrow('delete fail');
+      await expect(controller.deleteUser('4', mockUser)).rejects.toThrow(
+        'delete fail',
+      );
     });
   });
 });

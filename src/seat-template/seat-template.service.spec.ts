@@ -40,7 +40,6 @@ describe('SeatTemplateService', () => {
     (service as any).logger = mockLogger;
   });
 
-
   describe('findAll', () => {
     it('should return all seats', async () => {
       const data = [{ id: '1' }];
@@ -65,11 +64,11 @@ describe('SeatTemplateService', () => {
 
     it('should throw InternalServerErrorException on crash', async () => {
       mockPrisma.screenTemplateSeat.findMany.mockRejectedValue(
-          new Error('DB error'),
+        new Error('DB error'),
       );
 
       await expect(service.findAll()).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
 
@@ -77,13 +76,12 @@ describe('SeatTemplateService', () => {
       mockPrisma.screenTemplateSeat.findMany.mockRejectedValue(undefined);
 
       await expect(service.findAll()).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
 
       expect(mockLogger.error).toHaveBeenCalled();
     });
   });
-
 
   describe('findOne', () => {
     it('should return seat', async () => {
@@ -99,9 +97,7 @@ describe('SeatTemplateService', () => {
     it('should throw NotFoundException when not found', async () => {
       mockPrisma.screenTemplateSeat.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOne('1')).rejects.toThrow(
-          NotFoundException,
-      );
+      await expect(service.findOne('1')).rejects.toThrow(NotFoundException);
     });
 
     it('should propagate NotFoundException through handleError', async () => {
@@ -116,15 +112,14 @@ describe('SeatTemplateService', () => {
 
     it('should handle prisma crash', async () => {
       mockPrisma.screenTemplateSeat.findUnique.mockRejectedValue(
-          new Error('fail'),
+        new Error('fail'),
       );
 
       await expect(service.findOne('1')).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
-
 
   describe('findByTemplate', () => {
     it('should return ordered seats', async () => {
@@ -139,10 +134,7 @@ describe('SeatTemplateService', () => {
 
       expect(mockPrisma.screenTemplateSeat.findMany).toHaveBeenCalledWith({
         where: { templateId: 't1' },
-        orderBy: [
-          { posY: 'asc' },
-          { posX: 'asc' },
-        ],
+        orderBy: [{ posY: 'asc' }, { posX: 'asc' }],
       });
     });
 
@@ -150,7 +142,7 @@ describe('SeatTemplateService', () => {
       mockPrisma.screenTemplate.findUnique.mockResolvedValue(null);
 
       await expect(service.findByTemplate('t1')).rejects.toThrow(
-          NotFoundException,
+        NotFoundException,
       );
     });
 
@@ -158,15 +150,14 @@ describe('SeatTemplateService', () => {
       mockPrisma.screenTemplate.findUnique.mockResolvedValue({ id: 't1' });
 
       mockPrisma.screenTemplateSeat.findMany.mockRejectedValue(
-          new Error('fail'),
+        new Error('fail'),
       );
 
       await expect(service.findByTemplate('t1')).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
   });
-
 
   describe('generateBulk', () => {
     const dto = {
@@ -193,7 +184,7 @@ describe('SeatTemplateService', () => {
       });
 
       expect(mockLogger.log).toHaveBeenCalledWith(
-          expect.stringContaining('Generating seats'),
+        expect.stringContaining('Generating seats'),
       );
     });
 
@@ -201,7 +192,7 @@ describe('SeatTemplateService', () => {
       mockPrisma.screenTemplate.findUnique.mockResolvedValue(null);
 
       await expect(service.generateBulk(dto)).rejects.toThrow(
-          NotFoundException,
+        NotFoundException,
       );
     });
 
@@ -209,7 +200,7 @@ describe('SeatTemplateService', () => {
       mockPrisma.screenTemplate.findUnique.mockResolvedValue({ id: 't1' });
 
       await expect(
-          service.generateBulk({ ...dto, seatMap: [] }),
+        service.generateBulk({ ...dto, seatMap: [] }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -217,7 +208,7 @@ describe('SeatTemplateService', () => {
       mockPrisma.screenTemplate.findUnique.mockResolvedValue({ id: 't1' });
 
       await expect(
-          service.generateBulk({ ...dto, seatsPerRow: 0 }),
+        service.generateBulk({ ...dto, seatsPerRow: 0 }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -225,11 +216,11 @@ describe('SeatTemplateService', () => {
       mockPrisma.screenTemplate.findUnique.mockResolvedValue({ id: 't1' });
 
       mockPrisma.screenTemplateSeat.createMany.mockRejectedValue(
-          new Error('DB fail'),
+        new Error('DB fail'),
       );
 
       await expect(service.generateBulk(dto)).rejects.toThrow(
-          InternalServerErrorException,
+        InternalServerErrorException,
       );
     });
 
@@ -239,10 +230,10 @@ describe('SeatTemplateService', () => {
       let capturedData: any = null;
 
       mockPrisma.screenTemplateSeat.createMany.mockImplementation(
-          ({ data }) => {
-            capturedData = data;
-            return Promise.resolve({ count: data.length });
-          },
+        ({ data }) => {
+          capturedData = data;
+          return Promise.resolve({ count: data.length });
+        },
       );
 
       await service.generateBulk(dto);
@@ -250,12 +241,12 @@ describe('SeatTemplateService', () => {
       expect(capturedData.length).toBe(6);
 
       expect(capturedData[0]).toEqual(
-          expect.objectContaining({
-            templateId: 't1',
-            seatRow: 'A',
-            seatNumber: 1,
-            posX: 1,
-          }),
+        expect.objectContaining({
+          templateId: 't1',
+          seatRow: 'A',
+          seatNumber: 1,
+          posX: 1,
+        }),
       );
     });
 
@@ -265,10 +256,10 @@ describe('SeatTemplateService', () => {
       let captured: any[] = [];
 
       mockPrisma.screenTemplateSeat.createMany.mockImplementation(
-          ({ data }) => {
-            captured = data;
-            return Promise.resolve({ count: data.length });
-          },
+        ({ data }) => {
+          captured = data;
+          return Promise.resolve({ count: data.length });
+        },
       );
 
       await service.generateBulk(dto);
@@ -283,10 +274,10 @@ describe('SeatTemplateService', () => {
       let captured: any[] = [];
 
       mockPrisma.screenTemplateSeat.createMany.mockImplementation(
-          ({ data }) => {
-            captured = data;
-            return Promise.resolve({ count: data.length });
-          },
+        ({ data }) => {
+          captured = data;
+          return Promise.resolve({ count: data.length });
+        },
       );
 
       await service.generateBulk(dto);
@@ -304,17 +295,17 @@ describe('SeatTemplateService', () => {
       let captured: any[] = [];
 
       mockPrisma.screenTemplateSeat.createMany.mockImplementation(
-          ({ data }) => {
-            captured = data;
-            return Promise.resolve({ count: data.length });
-          },
+        ({ data }) => {
+          captured = data;
+          return Promise.resolve({ count: data.length });
+        },
       );
 
       await service.generateBulk(dto);
 
       const rowASeats = captured
-          .filter((s) => s.seatRow === 'A')
-          .map((s) => s.seatNumber);
+        .filter((s) => s.seatRow === 'A')
+        .map((s) => s.seatNumber);
 
       expect(rowASeats).toEqual([1, 2, 3]);
     });
@@ -325,10 +316,10 @@ describe('SeatTemplateService', () => {
       let captured: any[] = [];
 
       mockPrisma.screenTemplateSeat.createMany.mockImplementation(
-          ({ data }) => {
-            captured = data;
-            return Promise.resolve({ count: data.length });
-          },
+        ({ data }) => {
+          captured = data;
+          return Promise.resolve({ count: data.length });
+        },
       );
 
       await service.generateBulk(dto);
@@ -365,11 +356,11 @@ describe('SeatTemplateService', () => {
       await service.generateBulk(dto);
 
       expect(mockLogger.log).toHaveBeenCalledWith(
-          expect.stringContaining('Generating seats'),
+        expect.stringContaining('Generating seats'),
       );
 
       expect(mockLogger.log).toHaveBeenCalledWith(
-          expect.stringContaining('Created'),
+        expect.stringContaining('Created'),
       );
     });
 
@@ -409,16 +400,15 @@ describe('SeatTemplateService', () => {
       let captured: any[] = [];
 
       mockPrisma.screenTemplateSeat.createMany.mockImplementation(
-          ({ data }) => {
-            captured = data;
-            return Promise.resolve({ count: data.length });
-          },
+        ({ data }) => {
+          captured = data;
+          return Promise.resolve({ count: data.length });
+        },
       );
 
       await service.generateBulk(largeDto as any);
 
       expect(captured).toHaveLength(500); // 10 × 50
     });
-
   });
 });

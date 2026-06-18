@@ -6,102 +6,99 @@ import cookieParser from 'cookie-parser';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 describe('Authentication E2E', () => {
-    let app: INestApplication;
+  let app: INestApplication;
 
-    const testEmail = `test_${Date.now()}@mail.com`;
-    const testPassword = 'Password123!';
+  const testEmail = `test_${Date.now()}@mail.com`;
+  const testPassword = 'Password123!';
 
-    let cookies: string[];
+  let cookies: string[];
 
-    beforeAll(async () => {
-        const moduleFixture: TestingModule = await Test.createTestingModule({
-            imports: [AppModule],
-        }).compile();
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
 
-        app = moduleFixture.createNestApplication();
+    app = moduleFixture.createNestApplication();
 
-        app.use(cookieParser());
+    app.use(cookieParser());
 
-        await app.init();
+    await app.init();
+  });
+
+  afterAll(async () => {
+    const prisma = app.get(PrismaService);
+    await prisma.$disconnect();
+
+    await app.close();
+  });
+
+  it('POST /auth/register', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        email: testEmail,
+        password: testPassword,
+        firstName: 'Test',
+        lastName: 'User',
+      })
+      .expect(201);
+
+    expect(res.body.message).toBeDefined();
+
+    const prisma = app.get(PrismaService);
+
+    await prisma.account.update({
+      where: { email: testEmail },
+      data: { emailVerified: true },
     });
+  });
 
-    afterAll(async () => {
-        const prisma = app.get(PrismaService);
-        await prisma.$disconnect();
+  it('POST /auth/login', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({
+        email: testEmail,
+        password: testPassword,
+      })
+      .expect(200);
 
-        await app.close();
-    });
+    const setCookie = res.headers['set-cookie'];
 
+    cookies = Array.isArray(setCookie) ? setCookie : [];
 
-    it('POST /auth/register', async () => {
-        const res = await request(app.getHttpServer())
-            .post('/auth/register')
-            .send({
-                email: testEmail,
-                password: testPassword,
-                firstName: 'Test',
-                lastName: 'User',
-            })
-            .expect(201);
+    expect(cookies).toBeDefined();
+  });
 
-        expect(res.body.message).toBeDefined();
+  it('GET /auth/me should fail without token', async () => {
+    await request(app.getHttpServer()).get('/auth/me').expect(401);
+  });
 
-        const prisma = app.get(PrismaService);
+  it('LOGIN → ME flow', async () => {
+    const login = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({
+        email: testEmail,
+        password: testPassword,
+      })
+      .expect(200);
 
-        await prisma.account.update({
-            where: { email: testEmail },
-            data: { emailVerified: true },
-        });
-    });
+    const cookies = login.headers['set-cookie'];
 
-    it('POST /auth/login', async () => {
-        const res = await request(app.getHttpServer())
-            .post('/auth/login')
-            .send({
-                email: testEmail,
-                password: testPassword,
-            })
-            .expect(200);
+    const me = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Cookie', cookies)
+      .expect(200);
 
-        const setCookie = res.headers['set-cookie'];
+    expect(me.body.user).toBeDefined();
+    expect(me.body.user.email).toBe(testEmail);
+  });
 
-        cookies = Array.isArray(setCookie) ? setCookie : [];
+  it('POST /auth/forgot-password', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/auth/forgot-password')
+      .send({ email: testEmail })
+      .expect(200);
 
-        expect(cookies).toBeDefined();
-    });
-
-    it('GET /auth/me should fail without token', async () => {
-        await request(app.getHttpServer())
-            .get('/auth/me')
-            .expect(401);
-    });
-
-    it('LOGIN → ME flow', async () => {
-        const login = await request(app.getHttpServer())
-            .post('/auth/login')
-            .send({
-                email: testEmail,
-                password: testPassword,
-            })
-            .expect(200);
-
-        const cookies = login.headers['set-cookie'];
-
-        const me = await request(app.getHttpServer())
-            .get('/auth/me')
-            .set('Cookie', cookies)
-            .expect(200);
-
-        expect(me.body.user).toBeDefined();
-        expect(me.body.user.email).toBe(testEmail);
-    });
-
-    it('POST /auth/forgot-password', async () => {
-        const res = await request(app.getHttpServer())
-            .post('/auth/forgot-password')
-            .send({ email: testEmail })
-            .expect(200);
-
-        expect(res.body.message).toBeDefined();
-    });
+    expect(res.body.message).toBeDefined();
+  });
 });
