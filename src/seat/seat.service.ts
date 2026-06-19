@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSeatLockDto } from './dto/create-seat-lock.dto';
-import {Prisma} from "@prisma/client";
+import {BookingStatus, Prisma} from "@prisma/client";
 import {Cron} from "@nestjs/schedule";
 
 @Injectable()
@@ -50,7 +50,21 @@ export class SeatService {
               },
             },
           },
-          bookingSeats: true,
+            bookingSeats: {
+                where: {
+                    booking: {
+                        status: {
+                            in: [
+                                BookingStatus.PENDING,
+                                BookingStatus.CONFIRMED,
+                            ],
+                        },
+                    },
+                },
+                include: {
+                    booking: true,
+                },
+            },
         },
       }),
 
@@ -76,8 +90,24 @@ export class SeatService {
         showtime.seatLocks.map((lock) => lock.seatId),
     );
 
+    const pendingSeatIds = new Set(
+        showtime.bookingSeats
+            .filter(
+                (seat) =>
+                    seat.booking.status ===
+                    BookingStatus.PENDING,
+            )
+            .map((seat) => seat.seatId),
+    );
+
     const bookedSeatIds = new Set(
-        showtime.bookingSeats.map((seat) => seat.seatId),
+        showtime.bookingSeats
+            .filter(
+                (seat) =>
+                    seat.booking.status ===
+                    BookingStatus.CONFIRMED,
+            )
+            .map((seat) => seat.seatId),
     );
 
     return showtime.screen.seats.map((seat) => {
@@ -86,7 +116,11 @@ export class SeatService {
 
       if (bookedSeatIds.has(seat.id)) {
         status = 'BOOKED';
-      } else if (lockedSeatIds.has(seat.id)) {
+      }
+      else if (
+          lockedSeatIds.has(seat.id) ||
+          pendingSeatIds.has(seat.id)
+      ) {
         status = 'LOCKED';
       }
 
@@ -139,12 +173,21 @@ export class SeatService {
           });
 
           // Check if seat already booked
-          const bookedSeat = await tx.bookingSeat.findFirst({
-            where: {
-              seatId: dto.seatId,
-              showtimeId: dto.showtimeId,
-            },
-          });
+          const bookedSeat =
+              await tx.bookingSeat.findFirst({
+                where: {
+                  seatId: dto.seatId,
+                  showtimeId: dto.showtimeId,
+                  booking: {
+                    status: {
+                      in: [
+                        BookingStatus.PENDING,
+                        BookingStatus.CONFIRMED,
+                      ],
+                    },
+                  },
+                },
+              });
 
           if (bookedSeat) {
             throw new BadRequestException('Seat already booked');
@@ -189,7 +232,9 @@ export class SeatService {
           }
 
           //Time Countdown
-          const expiresAt = new Date(now.getTime() + 5 * 60 * 1000);
+          // const expiresAt = new Date(now.getTime() + 5 * 60 * 1000);
+          const expiresAt = new Date(now.getTime() +  60 * 1000);
+
 
           const lock = await tx.seatLock.create({
             data: {

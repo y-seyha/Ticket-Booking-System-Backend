@@ -83,6 +83,7 @@ enum BookingStatus {
   PENDING
   CONFIRMED
   CANCELLED
+  EXPIRED
 }
 
 enum PaymentProvider {
@@ -97,6 +98,7 @@ enum PaymentStatus {
   SUCCESS
   FAILED
   REFUNDED
+  EXPIRED
 }
 
 model Account {
@@ -420,6 +422,7 @@ model Booking {
   bookingCode  String        @unique
   totalPrice   Decimal       @db.Decimal(10, 2)
   status       BookingStatus
+  expiresAt    DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   account      Account       @relation(fields: [accountId], references: [id])
@@ -456,6 +459,7 @@ model Payment {
   amount         Decimal         @db.Decimal(10, 2)
   currency       String          @default("USD")
   status         PaymentStatus
+  expiresAt      DateTime?
   transactionRef String?
   paidAt         DateTime?
   createdAt      DateTime        @default(now())
