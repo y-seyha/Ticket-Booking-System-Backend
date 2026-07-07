@@ -31,103 +31,181 @@ export class MailerService {
     }
   }
 
+  // async sendVerificationEmail(to: string, token: string) {
+  //   // const backendUrl = new URL(process.env.BACKEND_URL!);
+  //
+  //   // const verificationUrl = new URL(
+  //   //     '/verify-email',
+  //   //     process.env.FRONTEND_URL,
+  //   // );
+  //
+  //   const baseUrl = process.env.BACKEND_URL;
+  //
+  //   if (!baseUrl) {
+  //     throw new Error('BACKEND_URL is missing');
+  //   }
+  //
+  //   const verificationUrl = new URL('/api/v1/auth/verify-email', baseUrl);
+  //   verificationUrl.searchParams.set('token', token);
+  //
+  //   const html = this.buildVerificationTemplate(verificationUrl.toString());
+  //
+  //   const text = `Verify your email: ${verificationUrl.toString()}`;
+  //
+  //   const res = await axios.post(
+  //     this.endpoint,
+  //     {
+  //       sender: this.sender,
+  //
+  //       to: [
+  //         {
+  //           email: to,
+  //         },
+  //       ],
+  //
+  //       subject: 'Verify Your Email - Coffee POS System',
+  //
+  //       htmlContent: html,
+  //
+  //       textContent: text,
+  //     },
+  //     {
+  //       headers: this.headers,
+  //       timeout: 10000,
+  //     },
+  //   );
+  //
+  //   console.log('📧 Brevo verification email response:', res.data);
+  //
+  //   return res.data;
+  // }
+
+// Inside MailerService (NestJS)
   async sendVerificationEmail(to: string, token: string) {
-    // const backendUrl = new URL(process.env.BACKEND_URL!);
+    const frontendBaseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-    // const verificationUrl = new URL(
-    //     '/verify-email',
-    //     process.env.FRONTEND_URL,
-    // );
-
-    const baseUrl = process.env.BACKEND_URL;
-
-    if (!baseUrl) {
-      throw new Error('BACKEND_URL is missing');
-    }
-
-    const verificationUrl = new URL('/api/v1/auth/verify-email', baseUrl);
+    const verificationUrl = new URL('/auth/verify-email', frontendBaseUrl);
     verificationUrl.searchParams.set('token', token);
 
     const html = this.buildVerificationTemplate(verificationUrl.toString());
-
     const text = `Verify your email: ${verificationUrl.toString()}`;
 
     const res = await axios.post(
-      this.endpoint,
-      {
-        sender: this.sender,
-
-        to: [
-          {
-            email: to,
-          },
-        ],
-
-        subject: 'Verify Your Email - Coffee POS System',
-
-        htmlContent: html,
-
-        textContent: text,
-      },
-      {
-        headers: this.headers,
-        timeout: 10000,
-      },
+        this.endpoint,
+        {
+          sender: this.sender,
+          to: [{ email: to }],
+          subject: 'Verify Your Email - Coffee POS System',
+          htmlContent: html,
+          textContent: text,
+        },
+        { headers: this.headers, timeout: 10000 },
     );
 
     console.log('📧 Brevo verification email response:', res.data);
-
     return res.data;
   }
 
-  async sendResetPasswordEmail(to: string, token: string) {
-    const baseUrl = process.env.BACKEND_URL!;
+  // async sendResetPasswordEmail(to: string, token: string) {
+  //   const baseUrl = process.env.BACKEND_URL!;
+  //
+  //   const resetUrl = new URL('/api/v1/auth/reset-password', baseUrl);
+  //   resetUrl.searchParams.set('token', token);
+  //
+  //   console.log(resetUrl.toString());
+  //
+  //   const html = this.wrapEmail(
+  //     'Reset Password',
+  //     `
+  //       <h2 style="margin:0 0 10px;font-size:18px;font-weight:600;">
+  //         Reset your password
+  //       </h2>
+  //
+  //       <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">
+  //         We received a request to reset your password.
+  //       </p>
+  //
+  //       <div style="text-align:center;margin:26px 0;">
+  //         <a href="${resetUrl}" style="
+  //           background:#111827;
+  //           color:#fff;
+  //           padding:12px 20px;
+  //           text-decoration:none;
+  //           border-radius:6px;
+  //         ">
+  //           Reset Password
+  //         </a>
+  //       </div>
+  //
+  //       <p style="font-size:12px;color:#6b7280;text-align:center;">
+  //         This link expires in 5 minutes.
+  //       </p>
+  //       `,
+  //   );
+  //
+  //   await axios.post(
+  //     this.endpoint,
+  //     {
+  //       sender: this.sender,
+  //       to: [{ email: to }],
+  //       subject: 'Reset Password',
+  //       htmlContent: html,
+  //     },
+  //     { headers: this.headers },
+  //   );
+  // }
 
-    const resetUrl = new URL('/api/v1/auth/reset-password', baseUrl);
-    resetUrl.searchParams.set('token', token);
+    async sendResetPasswordEmail(to: string, token: string) {
+        // 1. Change this to use your FRONTEND client application URL
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
 
-    console.log(resetUrl.toString());
+        // 2. Point to your Next.js frontend route (e.g., /auth/reset-password)
+        const resetUrl = new URL('/auth/reset-password', frontendUrl);
+        resetUrl.searchParams.set('token', token);
 
-    const html = this.wrapEmail(
-      'Reset Password',
-      `
-        <h2 style="margin:0 0 10px;font-size:18px;font-weight:600;">
-          Reset your password
-        </h2>
+        console.log("Email Reset Link generated:", resetUrl.toString());
 
-        <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">
-          We received a request to reset your password.
-        </p>
+        const html = this.wrapEmail(
+            'Reset Password',
+            `
+      <h2 style="margin:0 0 10px;font-size:18px;font-weight:600;">
+        Reset your password
+      </h2>
 
-        <div style="text-align:center;margin:26px 0;">
-          <a href="${resetUrl}" style="
-            background:#111827;
-            color:#fff;
-            padding:12px 20px;
-            text-decoration:none;
-            border-radius:6px;
-          ">
-            Reset Password
-          </a>
-        </div>
+      <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">
+        We received a request to reset your password.
+      </p>
 
-        <p style="font-size:12px;color:#6b7280;text-align:center;">
-          This link expires in 5 minutes.
-        </p>
-        `,
-    );
+      <div style="text-align:center;margin:26px 0;">
+        <a href="${resetUrl.toString()}" style="
+          background:#111827;
+          color:#fff;
+          padding:12px 20px;
+          text-decoration:none;
+          border-radius:6px;
+          display:inline-block;
+        ">
+          Reset Password
+        </a>
+      </div>
 
-    await axios.post(
-      this.endpoint,
-      {
-        sender: this.sender,
-        to: [{ email: to }],
-        subject: 'Reset Password',
-        htmlContent: html,
-      },
-      { headers: this.headers },
-    );
-  }
+      <p style="font-size:12px;color:#6b7280;text-align:center;">
+        This link expires in 5 minutes.
+      </p>
+      `,
+        );
+
+        await axios.post(
+            this.endpoint,
+            {
+                sender: this.sender,
+                to: [{ email: to }],
+                subject: 'Reset Password',
+                htmlContent: html,
+            },
+            { headers: this.headers },
+        );
+    }
 
   async sendReactivateAccountEmail(to: string, token: string) {
     const baseUrl = process.env.BACKEND_URL!;

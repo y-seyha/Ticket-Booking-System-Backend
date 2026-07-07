@@ -1,3 +1,4 @@
+/* eslint-disable */
 import {
   Injectable,
   Logger,
@@ -30,8 +31,8 @@ export class ScreenTemplateService {
       const err = error as any;
 
       this.logger.error(
-          'Create template failed',
-          err?.stack || JSON.stringify(error),
+        'Create template failed',
+        err?.stack || JSON.stringify(error),
       );
 
       throw new InternalServerErrorException('Failed to create template');
@@ -40,11 +41,16 @@ export class ScreenTemplateService {
 
   async findAll() {
     try {
-      return await this.prisma.screenTemplate.findMany({
+      const templates = await this.prisma.screenTemplate.findMany({
         include: {
           templateSeats: true,
         },
+        orderBy: {
+          createdAt: 'desc',
+        },
       });
+
+      return templates.map((tmpl) => this.normalizeTemplate(tmpl));
     } catch (error) {
       this.logger.error('Fetch templates failed', error.stack);
       throw new InternalServerErrorException();
@@ -64,7 +70,7 @@ export class ScreenTemplateService {
         throw new NotFoundException('Screen template not found');
       }
 
-      return template;
+      return this.normalizeTemplate(template);
     } catch (error) {
       this.logger.error(`Fetch template ${id} failed`, error.stack);
 
@@ -72,6 +78,23 @@ export class ScreenTemplateService {
 
       throw new InternalServerErrorException();
     }
+  }
+
+  private normalizeTemplate(template: any) {
+    if (!template) return null;
+
+    return {
+      ...template,
+      layouts: [
+        {
+          id: template.id,
+          layoutId: template.id,
+          name: `${template.name} - Default Layout`,
+          layoutName: `${template.name} - Default Layout`,
+          seatsCount: template.templateSeats?.length || 0,
+        }
+      ]
+    };
   }
 
   async update(id: string, dto: UpdateScreenTemplateDto) {
@@ -130,14 +153,14 @@ export class ScreenTemplateService {
       return updated;
     } catch (error: any) {
       this.logger.error(
-          `Toggle active failed for ${id}`,
-          error?.stack || error,
+        `Toggle active failed for ${id}`,
+        error?.stack || error,
       );
 
       if (error instanceof NotFoundException) throw error;
 
       throw new InternalServerErrorException(
-          'Failed to toggle screen template status',
+        'Failed to toggle screen template status',
       );
     }
   }

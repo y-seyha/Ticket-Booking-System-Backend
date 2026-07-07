@@ -86,7 +86,10 @@ export class TheaterService {
           skip,
           take: limit,
           orderBy: { createdAt: 'desc' },
-          include: { screens: true },
+          include: {
+            screens: true,
+            image: true,
+          },
         }),
         this.prisma.theater.count({ where }),
       ]);
@@ -110,7 +113,7 @@ export class TheaterService {
     try {
       const theater = await this.prisma.theater.findUnique({
         where: { id },
-        include: { screens: true },
+        include: { screens: true , image : true},
       });
 
       if (!theater) {

@@ -317,32 +317,45 @@ model Screen {
 }
 
 model ScreenTemplate {
-  id              String               @id @default(uuid())
+  id              String     @id @default(uuid())
   name            String
   type            ScreenType
   description     String?
-  isActive        Boolean              @default(true)
-  screenSurcharge Decimal              @db.Decimal(10, 2)   @default(0)
-  screens         Screen[]
-  templateSeats   ScreenTemplateSeat[]
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
+  isActive        Boolean    @default(true)
+  screenSurcharge Decimal    @default(0) @db.Decimal(10, 2)
+
+  layouts       SeatLayout[]
+  screens       Screen[]
+  templateSeats ScreenTemplateSeat[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+}
+
+model SeatLayout {
+  id         String               @id @default(uuid())
+  name       String
+  templateId String
+  template   ScreenTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  seats      ScreenTemplateSeat[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ScreenTemplateSeat {
-  id String @id @default(uuid())
+  id       String     @id @default(uuid())
+  layoutId String
+  layout   SeatLayout @relation(fields: [layoutId], references: [id], onDelete: Cascade)
 
-  templateId String
+  seatRow          String
+  seatNumber       Int
+  posX             Int
+  posY             Int
+  seatType         SeatType
+  screenTemplate   ScreenTemplate? @relation(fields: [screenTemplateId], references: [id])
+  screenTemplateId String?
 
-  seatRow    String
-  seatNumber Int
-
-  posX Int
-  posY Int
-
-  seatType SeatType
-
-  template ScreenTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  @@unique([layoutId, seatRow, seatNumber])
 }
 
 model Seat {
@@ -364,7 +377,7 @@ model Seat {
 model SeatPricingRule {
   id            String   @id @default(uuid())
   seatType      SeatType @unique
-  seatSurcharge Decimal  @db.Decimal(10, 2)  @default(0)
+  seatSurcharge Decimal  @default(0) @db.Decimal(10, 2)
   isActive      Boolean  @default(true)
 
   createdAt DateTime @default(now())
@@ -425,7 +438,7 @@ model Booking {
   expiresAt    DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
-  account      Account       @relation(fields: [accountId], references: [id])
+  account      Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
   showtime     Showtime      @relation(fields: [showtimeId], references: [id])
   bookingSeats BookingSeat[]
   payment      Payment?

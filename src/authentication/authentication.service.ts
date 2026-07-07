@@ -3,8 +3,6 @@ import {
   Logger,
   BadRequestException,
   UnauthorizedException,
-  NotFoundException,
-  InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
@@ -63,19 +61,19 @@ export class AuthenticationService {
           data: {
             accountId: existingAccount.id,
             tokenHash,
-            type: TokenType.REACTIVATION,
-            expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+            type: TokenType.EMAIL,
+            expiresAt: new Date(Date.now() + 1000 * 60 * 60), // 1 hour expiration
           },
         });
 
         await this.mailerService.sendVerificationEmail(
-          existingAccount.email,
-          rawToken,
+            existingAccount.email,
+            rawToken,
         );
 
         return {
           message:
-            'Account exists but not verified. Verification email resent.',
+              'Account exists but not verified. Verification email resent.',
         };
       }
 
@@ -110,12 +108,13 @@ export class AuthenticationService {
       const rawToken = crypto.randomUUID();
       const tokenHash = await bcrypt.hash(rawToken, 10);
 
+      // FIX 2: Extended expiration window from 5 minutes to 1 hour
       await this.prisma.verificationToken.create({
         data: {
           accountId: account.id,
           tokenHash,
-          type: 'EMAIL',
-          expiresAt: new Date(Date.now() + 1000 * 60 * 5), // 5mns
+          type: TokenType.EMAIL, // Safe typed enum usage
+          expiresAt: new Date(Date.now() + 1000 * 60 * 60), // 1 hour expiration
         },
       });
 
@@ -130,17 +129,57 @@ export class AuthenticationService {
       this.handlePrismaError(error);
     }
   }
+  // async verifyEmail(token: string) {
+  //   const tokens = await this.prisma.verificationToken.findMany({
+  //     where: {
+  //       type: 'EMAIL',
+  //       usedAt: null,
+  //       expiresAt: { gt: new Date() },
+  //     },
+  //   });
+  //
+  //   let matchedToken: VerificationToken | null = null;
+  //
+  //   for (const t of tokens) {
+  //     const isValid = await bcrypt.compare(token, t.tokenHash);
+  //     if (isValid) {
+  //       matchedToken = t;
+  //       break;
+  //     }
+  //   }
+  //
+  //   if (!matchedToken) {
+  //     throw new BadRequestException('Invalid or expired token');
+  //   }
+  //
+  //   await this.prisma.$transaction([
+  //     this.prisma.account.update({
+  //       where: { id: matchedToken.accountId },
+  //       data: { emailVerified: true },
+  //     }),
+  //
+  //     this.prisma.verificationToken.update({
+  //       where: { id: matchedToken.id },
+  //       data: { usedAt: new Date() },
+  //     }),
+  //   ]);
+  //
+  //   return true;
+  // }
 
   async verifyEmail(token: string) {
     const tokens = await this.prisma.verificationToken.findMany({
       where: {
-        type: 'EMAIL',
+        type: 'EMAIL', // This maps directly to your TokenType.EMAIL enum safely
         usedAt: null,
         expiresAt: { gt: new Date() },
       },
+      include: {
+        account: true
+      }
     });
 
-    let matchedToken: VerificationToken | null = null;
+    let matchedToken: any = null;
 
     for (const t of tokens) {
       const isValid = await bcrypt.compare(token, t.tokenHash);
@@ -166,7 +205,7 @@ export class AuthenticationService {
       }),
     ]);
 
-    return true;
+    return { account: matchedToken.account };
   }
 
   async login(dto: LoginDto, req: any) {
@@ -568,6 +607,38 @@ export class AuthenticationService {
     }
 
     return this.issueTokens(account, req);
+  }
+
+  async handlePostLoginState(account: any, req: any, device?: DeviceInfo) {
+    const state = this.getAccountState(account);
+    if (!state.allowed) {
+      throw new UnauthorizedException(`Account ${state.type.toLowerCase()}`);
+    }
+
+
+    if (account.twoFactorEnabled) {
+      const tempToken = this.jwt.sign(
+          { sub: account.id, type: '2fa-pending' },
+          { expiresIn: '5m' },
+      );
+
+      return {
+        requiresTwoFactor: true,
+        tempToken,
+      };
+    }
+
+
+    await this.prisma.account.update({
+      where: { id: account.id },
+      data: {
+        lastLoginAt: new Date(),
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+      },
+    });
+
+    return this.issueTokens(account, req, device);
   }
 
   private encrypt(text: string): string {

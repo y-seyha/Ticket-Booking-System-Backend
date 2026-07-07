@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import {Movie, MovieStatus, Prisma} from '@prisma/client';
+import { Movie, MovieStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateMovieDto } from './dto/create-movie.dto';
 import { UpdateMovieDto } from './dto/update-movie.dto';
@@ -122,12 +122,28 @@ export class MoviesService {
   async findOne(id: string) {
     try {
       const movie = await this.prisma.movie.findUnique({
-        where: {
-          id,
-        },
+        where: { id },
         include: {
           poster: true,
-          showtimes: true,
+          showtimes: {
+            where: {
+              status: 'SCHEDULED',
+            },
+            include: {
+              screen: {
+                include: {
+                  theater: {
+                    include: {
+                      image: true
+                    }
+                  }
+                }
+              }
+            },
+            orderBy: {
+              startTime: 'asc',
+            }
+          },
         },
       });
 
@@ -135,13 +151,51 @@ export class MoviesService {
         throw new NotFoundException('Movie not found');
       }
 
-      return movie;
+      return this.transformMovieResponse(movie);
     } catch (error) {
       this.logger.error(`Failed to fetch movie ${id}`, error?.stack);
-
       throw error;
     }
   }
+  private transformMovieResponse(movie: any) {
+    const locationsMap = new Map();
+
+    movie.showtimes.forEach((showtime: any) => {
+      const theater = showtime.screen.theater;
+      if (!locationsMap.has(theater.id)) {
+        locationsMap.set(theater.id, {
+          id: theater.id,
+          name: theater.name,
+          location: theater.location,
+          city: theater.city,
+          showtimes: [],
+        });
+      }
+
+      locationsMap.get(theater.id).showtimes.push({
+        id: showtime.id,
+        startTime: showtime.startTime,
+        endTime: showtime.endTime,
+        screenName: showtime.screen.name,
+        screenType: showtime.screen.type,
+        basePrice: showtime.basePrice,
+      });
+    });
+
+    return {
+      id: movie.id,
+      title: movie.title,
+      description: movie.description,
+      durationMinutes: movie.durationMinutes,
+      language: movie.language,
+      releaseDate: movie.releaseDate,
+      poster: movie.poster?.url || null,
+      backdrop: movie.poster?.url || null,
+      trailerYoutubeId: movie.trailerYoutubeId || null, // Added this line
+      showtimesByLocation: Array.from(locationsMap.values()),
+    };
+  }
+
 
   async update(
     id: string,
@@ -184,8 +238,7 @@ export class MoviesService {
         );
       }
 
-      const updatedReleaseDate =
-          dto.releaseDate ?? movie.releaseDate;
+      const updatedReleaseDate = dto.releaseDate ?? movie.releaseDate;
 
       return this.prisma.movie.update({
         where: { id },
@@ -264,14 +317,14 @@ export class MoviesService {
       //cannot set COMING_SOON after release date
       if (status === MovieStatus.COMING_SOON && releaseDate <= now) {
         throw new BadRequestException(
-            'Cannot set COMING_SOON for released movies'
+          'Cannot set COMING_SOON for released movies',
         );
       }
 
       //  cannot set NOW_SHOWING before release date
       if (status === MovieStatus.NOW_SHOWING && releaseDate > now) {
         throw new BadRequestException(
-            'Cannot set NOW_SHOWING before release date'
+          'Cannot set NOW_SHOWING before release date',
         );
       }
 
@@ -280,13 +333,11 @@ export class MoviesService {
         data: { status },
       });
     } catch (error) {
-      this.logger.error(
-          `Failed to update movie status ${id}`,
-          error?.stack,
-      );
+      this.logger.error(`Failed to update movie status ${id}`, error?.stack);
       throw error;
     }
   }
+
 
   private computeStatus(releaseDate: Date): MovieStatus {
     const timeZone = 'Asia/Phnom_Penh';
@@ -297,8 +348,9 @@ export class MoviesService {
     now.setHours(0, 0, 0, 0);
     release.setHours(0, 0, 0, 0);
 
-    return release > now
-        ? MovieStatus.COMING_SOON
-        : MovieStatus.NOW_SHOWING;
+    return release > now ? MovieStatus.COMING_SOON : MovieStatus.NOW_SHOWING;
   }
+
+
+
 }

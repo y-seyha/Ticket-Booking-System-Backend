@@ -6,7 +6,6 @@ import {
   Body,
   Param,
   UseGuards,
-  Req,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -18,7 +17,7 @@ import { SeatService } from './seat.service';
 import { CreateSeatLockDto } from './dto/create-seat-lock.dto';
 import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
 import { CurrentUser } from '../authentication/decorators/current-user.decorator';
-import {UnlockSeatDto} from "./dto/unlock-seat.dto";
+import { UnlockSeatDto } from './dto/unlock-seat.dto';
 
 @ApiTags('Seats')
 @Controller('seats')
@@ -28,8 +27,16 @@ export class SeatController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Get('cart')
-  getMyCart(@CurrentUser() user,) {
-    return this.seatService.getMyLockedSeats(user.id,);
+  getMyCart(@CurrentUser() user) {
+    return this.seatService.getMyLockedSeats(user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Delete('cart/clear')
+  @ApiOperation({ summary: 'Clear all locked seats in user cart' })
+  clearCart(@CurrentUser() user) {
+    return this.seatService.clearMyCart(user.id);
   }
 
   //done
@@ -61,11 +68,7 @@ export class SeatController {
   @ApiBearerAuth()
   @Delete('unlock')
   @ApiOperation({ summary: 'Unlock seat (remove from cart)' })
-  unlockSeat(@Req() req, @Body() dto: UnlockSeatDto,) {
-    return this.seatService.unlockSeat(
-        req.user.id,
-        dto.seatId,
-        dto.showtimeId,
-    );
+  unlockSeat(@CurrentUser() user, @Body() dto: UnlockSeatDto) {
+    return this.seatService.unlockSeat(user.id, dto.seatId, dto.showtimeId);
   }
 }

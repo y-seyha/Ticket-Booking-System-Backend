@@ -1,19 +1,16 @@
-import { IsOptional, IsString, IsPhoneNumber } from 'class-validator';
+import { IsString, IsOptional, Matches } from 'class-validator';
 
 export class UpdateProfileDto {
-  @IsOptional()
   @IsString()
+  @IsOptional()
   firstName?: string;
 
-  @IsOptional()
   @IsString()
+  @IsOptional()
   lastName?: string;
 
+  @IsString()
   @IsOptional()
-  @IsPhoneNumber()
+  @Matches(/^\+?[1-9]\d{1,14}$/, { message: 'Invalid phone number format' })
   phone?: string;
-
-  // @IsOptional()
-  // @IsString()
-  // avatarUrl?: string;
 }

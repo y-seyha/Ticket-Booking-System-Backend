@@ -7,8 +7,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSeatLockDto } from './dto/create-seat-lock.dto';
-import {BookingStatus, Prisma} from "@prisma/client";
-import {Cron} from "@nestjs/schedule";
+import { BookingStatus, Prisma } from '@prisma/client';
+import { Cron } from '@nestjs/schedule';
 
 @Injectable()
 export class SeatService {
@@ -50,21 +50,18 @@ export class SeatService {
               },
             },
           },
-            bookingSeats: {
-                where: {
-                    booking: {
-                        status: {
-                            in: [
-                                BookingStatus.PENDING,
-                                BookingStatus.CONFIRMED,
-                            ],
-                        },
-                    },
+          bookingSeats: {
+            where: {
+              booking: {
+                status: {
+                  in: [BookingStatus.PENDING, BookingStatus.CONFIRMED],
                 },
-                include: {
-                    booking: true,
-                },
+              },
             },
+            include: {
+              booking: true,
+            },
+          },
         },
       }),
 
@@ -80,47 +77,31 @@ export class SeatService {
     }
 
     const pricingMap = Object.fromEntries(
-        pricingRules.map((rule) => [
-          rule.seatType,
-          Number(rule.seatSurcharge),
-        ]),
+      pricingRules.map((rule) => [rule.seatType, Number(rule.seatSurcharge)]),
     );
 
     const lockedSeatIds = new Set(
-        showtime.seatLocks.map((lock) => lock.seatId),
+      showtime.seatLocks.map((lock) => lock.seatId),
     );
 
     const pendingSeatIds = new Set(
-        showtime.bookingSeats
-            .filter(
-                (seat) =>
-                    seat.booking.status ===
-                    BookingStatus.PENDING,
-            )
-            .map((seat) => seat.seatId),
+      showtime.bookingSeats
+        .filter((seat) => seat.booking.status === BookingStatus.PENDING)
+        .map((seat) => seat.seatId),
     );
 
     const bookedSeatIds = new Set(
-        showtime.bookingSeats
-            .filter(
-                (seat) =>
-                    seat.booking.status ===
-                    BookingStatus.CONFIRMED,
-            )
-            .map((seat) => seat.seatId),
+      showtime.bookingSeats
+        .filter((seat) => seat.booking.status === BookingStatus.CONFIRMED)
+        .map((seat) => seat.seatId),
     );
 
     return showtime.screen.seats.map((seat) => {
-      let status: 'AVAILABLE' | 'LOCKED' | 'BOOKED' =
-          'AVAILABLE';
+      let status: 'AVAILABLE' | 'LOCKED' | 'BOOKED' = 'AVAILABLE';
 
       if (bookedSeatIds.has(seat.id)) {
         status = 'BOOKED';
-      }
-      else if (
-          lockedSeatIds.has(seat.id) ||
-          pendingSeatIds.has(seat.id)
-      ) {
+      } else if (lockedSeatIds.has(seat.id) || pendingSeatIds.has(seat.id)) {
         status = 'LOCKED';
       }
 
@@ -132,146 +113,141 @@ export class SeatService {
         posY: seat.posY,
         seatType: seat.seatType,
         status,
-        surcharge:
-            pricingMap[seat.seatType] ?? 0,
+        surcharge: pricingMap[seat.seatType] ?? 0,
       };
     });
   }
 
   //add to cart
   async lockSeat(accountId: string, dto: CreateSeatLockDto) {
-      try {
-        const result = await this.prisma.$transaction(async (tx) => {
-          const [seat, showtime] = await Promise.all([
-            tx.seat.findUnique({
-              where: { id: dto.seatId },
-            }),
-            tx.showtime.findUnique({
-              where: { id: dto.showtimeId },
-            }),
-          ]);
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const [seat, showtime] = await Promise.all([
+          tx.seat.findUnique({
+            where: { id: dto.seatId },
+          }),
+          tx.showtime.findUnique({
+            where: { id: dto.showtimeId },
+          }),
+        ]);
 
-          if (!seat) {
-            throw new NotFoundException('Seat not found');
-          }
-
-          if (!showtime) {
-            throw new NotFoundException('Showtime not found');
-          }
-
-          const now = new Date();
-
-          // Remove expired lock if exists
-          await tx.seatLock.deleteMany({
-            where: {
-              seatId: dto.seatId,
-              showtimeId: dto.showtimeId,
-              expiresAt: {
-                lte: now,
-              },
-            },
-          });
-
-          // Check if seat already booked
-          const bookedSeat =
-              await tx.bookingSeat.findFirst({
-                where: {
-                  seatId: dto.seatId,
-                  showtimeId: dto.showtimeId,
-                  booking: {
-                    status: {
-                      in: [
-                        BookingStatus.PENDING,
-                        BookingStatus.CONFIRMED,
-                      ],
-                    },
-                  },
-                },
-              });
-
-          if (bookedSeat) {
-            throw new BadRequestException('Seat already booked');
-          }
-
-          // Check active lock
-          const activeLock = await tx.seatLock.findUnique({
-            where: {
-              showtimeId_seatId: {
-                showtimeId: dto.showtimeId,
-                seatId: dto.seatId,
-              },
-            },
-          });
-
-          if (activeLock) {
-            if (activeLock.accountId === accountId) {
-              return {
-                message: 'Seat already locked by you',
-                lock: activeLock,
-              };
-            }
-
-            throw new BadRequestException('Seat already locked');
-          }
-
-          // Optional seat limit
-          const currentLockCount = await tx.seatLock.count({
-            where: {
-              accountId,
-              showtimeId: dto.showtimeId,
-              expiresAt: {
-                gt: now,
-              },
-            },
-          });
-
-          if (currentLockCount >= 10) {
-            throw new BadRequestException(
-                'Maximum 10 seats allowed per booking',
-            );
-          }
-
-          //Time Countdown
-          // const expiresAt = new Date(now.getTime() + 5 * 60 * 1000);
-          const expiresAt = new Date(now.getTime() +  60 * 1000);
-
-
-          const lock = await tx.seatLock.create({
-            data: {
-              accountId,
-              seatId: dto.seatId,
-              showtimeId: dto.showtimeId,
-              expiresAt,
-            },
-          });
-
-          return {
-            message: 'Seat locked successfully',
-            lock,
-          };
-        });
-
-        return result;
-      } catch (error) {
-        this.logger.error(
-            'Seat lock failed',
-            error instanceof Error ? error.stack : String(error),
-        );
-
-        if (
-            error instanceof NotFoundException ||
-            error instanceof BadRequestException
-        ) {
-          throw error;
+        if (!seat) {
+          throw new NotFoundException('Seat not found');
         }
 
-        // Handle race condition
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        if (!showtime) {
+          throw new NotFoundException('Showtime not found');
+        }
+
+        const now = new Date();
+
+        // Remove expired lock if exists
+        await tx.seatLock.deleteMany({
+          where: {
+            seatId: dto.seatId,
+            showtimeId: dto.showtimeId,
+            expiresAt: {
+              lte: now,
+            },
+          },
+        });
+
+        // Check if seat already booked
+        const bookedSeat = await tx.bookingSeat.findFirst({
+          where: {
+            seatId: dto.seatId,
+            showtimeId: dto.showtimeId,
+            booking: {
+              status: {
+                in: [BookingStatus.PENDING, BookingStatus.CONFIRMED],
+              },
+            },
+          },
+        });
+
+        if (bookedSeat) {
+          throw new BadRequestException('Seat already booked');
+        }
+
+        // Check active lock
+        const activeLock = await tx.seatLock.findUnique({
+          where: {
+            showtimeId_seatId: {
+              showtimeId: dto.showtimeId,
+              seatId: dto.seatId,
+            },
+          },
+        });
+
+        if (activeLock) {
+          if (activeLock.accountId === accountId) {
+            return {
+              message: 'Seat already locked by you',
+              lock: activeLock,
+            };
+          }
+
           throw new BadRequestException('Seat already locked');
         }
 
-        throw new InternalServerErrorException();
+        // Optional seat limit
+        const currentLockCount = await tx.seatLock.count({
+          where: {
+            accountId,
+            showtimeId: dto.showtimeId,
+            expiresAt: {
+              gt: now,
+            },
+          },
+        });
+
+        if (currentLockCount >= 10) {
+          throw new BadRequestException('Maximum 10 seats allowed per booking');
+        }
+
+        //Time Countdown
+        const expiresAt = new Date(now.getTime() + 5 * 60 * 1000);
+        // const expiresAt = new Date(now.getTime() + 60 * 1000);
+
+        const lock = await tx.seatLock.create({
+          data: {
+            accountId,
+            seatId: dto.seatId,
+            showtimeId: dto.showtimeId,
+            expiresAt,
+          },
+        });
+
+        return {
+          message: 'Seat locked successfully',
+          lock,
+        };
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error(
+        'Seat lock failed',
+        error instanceof Error ? error.stack : String(error),
+      );
+
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
       }
+
+      // Handle race condition
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new BadRequestException('Seat already locked');
+      }
+
+      throw new InternalServerErrorException();
+    }
   }
 
   async getMyLockedSeats(accountId: string) {
@@ -311,10 +287,7 @@ export class SeatService {
 
     // seat surcharge map
     const pricingMap = Object.fromEntries(
-        pricingRules.map((rule) => [
-          rule.seatType,
-          Number(rule.seatSurcharge),
-        ]),
+      pricingRules.map((rule) => [rule.seatType, Number(rule.seatSurcharge)]),
     );
 
     if (locks.length === 0) {
@@ -336,11 +309,10 @@ export class SeatService {
       const basePrice = Number(lock.showtime.basePrice);
 
       const screenSurcharge = Number(
-          lock.showtime.screen.template.screenSurcharge,
+        lock.showtime.screen.template.screenSurcharge,
       );
 
-      const seatSurcharge =
-          pricingMap[lock.seat.seatType] ?? 0;
+      const seatSurcharge = pricingMap[lock.seat.seatType] ?? 0;
 
       const total = basePrice + screenSurcharge + seatSurcharge;
 
@@ -387,12 +359,12 @@ export class SeatService {
         email: user.email,
         role: user.role,
         profile: user.profile
-            ? {
+          ? {
               firstName: user.profile.firstName,
               lastName: user.profile.lastName,
               phone: user.profile.phone,
             }
-            : null,
+          : null,
       },
 
       items,
@@ -404,8 +376,20 @@ export class SeatService {
     };
   }
 
+
+  async clearMyCart(accountId: string) {
+    const result = await this.prisma.seatLock.deleteMany({
+      where: { accountId },
+    });
+
+    return {
+      message: 'Cart cleared successfully',
+      count: result.count,
+    };
+  }
+
   //remove seat from SeatLock(Cart)
-  async unlockSeat(accountId: string, seatId: string, showtimeId: string,) {
+  async unlockSeat(accountId: string, seatId: string, showtimeId: string) {
     const lock = await this.prisma.seatLock.findUnique({
       where: {
         showtimeId_seatId: {
@@ -420,9 +404,7 @@ export class SeatService {
     }
 
     if (lock.accountId !== accountId) {
-      throw new BadRequestException(
-          'You do not own this seat lock',
-      );
+      throw new BadRequestException('You do not own this seat lock');
     }
 
     await this.prisma.seatLock.delete({
@@ -447,9 +429,7 @@ export class SeatService {
     });
 
     if (result.count > 0) {
-      this.logger.log(
-          `Removed ${result.count} expired seat locks`,
-      );
+      this.logger.log(`Removed ${result.count} expired seat locks`);
     }
   }
 }

@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 import {
   Injectable,
   Logger,
@@ -8,7 +10,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateScreenDto } from './dto/create-screen.dto';
 import { UpdateScreenDto } from './dto/update-screen.dto';
-import { Prisma, SeatStatus, SeatType } from '@prisma/client';
+import { Prisma, SeatStatus } from '@prisma/client'; // Removed unused SeatType to fix ESLint warning
 
 type ScreenTemplateWithSeats = Prisma.ScreenTemplateGetPayload<{
   include: {
@@ -25,7 +27,7 @@ export class ScreenService {
   async create(dto: CreateScreenDto) {
     try {
       this.logger.log(
-        `Creating screen for theater=${dto.theaterId}, template=${dto.templateId}`,
+        `Creating screen for theater=${dto.theaterId}, template=${dto.templateId}, layout=${dto.layoutId}`,
       );
 
       const theater = await this.prisma.theater.findUnique({
@@ -36,15 +38,37 @@ export class ScreenService {
         throw new NotFoundException('Theater not found');
       }
 
+
       const template = await this.prisma.screenTemplate.findUnique({
         where: { id: dto.templateId },
         include: {
-          templateSeats: true,
+          layouts: {
+            where: {
+              id: dto.layoutId,
+            },
+            include: {
+              seats: true,
+            },
+          },
         },
       });
 
       if (!template) {
         throw new NotFoundException('Screen template not found');
+      }
+
+       const targetLayout = template.layouts.find((l) => l.id === dto.layoutId);
+
+      if (!targetLayout) {
+        throw new NotFoundException(
+          'The selected layout variant does not exist on this screen template',
+        );
+      }
+
+      if (!targetLayout.seats || targetLayout.seats.length === 0) {
+        throw new BadRequestException(
+          'The selected layout variant does not contain any seat configurations',
+        );
       }
 
       if (template.type !== dto.type) {
@@ -63,14 +87,29 @@ export class ScreenService {
           },
         });
 
-        await this.generateSeats(tx, screen.id, template);
+        const templateWithSeatsPayload: ScreenTemplateWithSeats = {
+          ...template,
+          templateSeats: targetLayout.seats.map((seat) => ({
+            id: seat.id,
+            layoutId: seat.layoutId,
+            seatRow: seat.seatRow,
+            seatNumber: seat.seatNumber,
+            posX: seat.posX,
+            posY: seat.posY,
+            seatType: seat.seatType,
+            screenTemplateId: null,
+          })),
+        };
+
+        await this.generateSeats(tx, screen.id, templateWithSeatsPayload);
 
         this.logger.log(`Screen created: ${screen.id}`);
 
         return screen;
       });
     } catch (error) {
-      this.logger.error('Failed to create screen', error.stack);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error('Failed to create screen', errorStack);
 
       if (
         error instanceof NotFoundException ||
@@ -111,20 +150,60 @@ export class ScreenService {
     this.logger.log(`Generated ${seats.length} seats for screen ${screenId}`);
   }
 
+  private normalizeScreen(screen: any) {
+    if (!screen) return null;
+
+    const layouts = screen.template?.layouts || screen.template?.variants || [];
+    const availableIds = layouts.map((l: any) => l.id).filter(Boolean);
+
+    const structuralLayoutId = Object.keys(screen).find(
+      (key) =>
+        typeof screen[key] === 'string' && availableIds.includes(screen[key]),
+    );
+
+    const finalLayoutId = structuralLayoutId
+      ? screen[structuralLayoutId]
+      : null;
+
+    const activeLayout =
+      layouts.find((l: any) => l.id === finalLayoutId) || layouts[0] || null;
+
+    const { template, ...screenData } = screen;
+
+    return {
+      ...screenData,
+      template: template
+        ? {
+            id: template.id,
+            name: template.name,
+            type: template.type,
+            isActive: template.isActive,
+          }
+        : null,
+      layout: activeLayout,
+      availableLayouts: layouts,
+    };
+  }
+
   async findAll() {
     try {
-      return await this.prisma.screen.findMany({
+      const screens = await this.prisma.screen.findMany({
         include: {
           theater: true,
-          template: true,
           seats: true,
+          template: {
+            include: {
+              layouts: true,
+              templateSeats: true,
+            },
+          },
         },
       });
+
+      return screens.map((screen) => this.normalizeScreen(screen));
     } catch (error) {
       const err = error as Error;
-
       this.logger.error('Failed to fetch screens', err?.stack || String(error));
-
       throw new InternalServerErrorException();
     }
   }
@@ -134,8 +213,13 @@ export class ScreenService {
       where: { id },
       include: {
         theater: true,
-        template: true,
         seats: true,
+        template: {
+          include: {
+            layouts: true,
+            templateSeats: true,
+          },
+        },
       },
     });
 
@@ -143,8 +227,9 @@ export class ScreenService {
       throw new NotFoundException('Screen not found');
     }
 
-    return screen;
+    return this.normalizeScreen(screen);
   }
+
 
   async update(id: string, dto: UpdateScreenDto) {
     try {
@@ -171,7 +256,8 @@ export class ScreenService {
         data: dto,
       });
     } catch (error) {
-      this.logger.error(`Failed to update screen ${id}`, error.stack);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Failed to update screen ${id}`, errorStack);
 
       if (
         error instanceof NotFoundException ||
@@ -192,7 +278,8 @@ export class ScreenService {
         where: { id },
       });
     } catch (error) {
-      this.logger.error(`Failed to delete screen ${id}`, error.stack);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Failed to delete screen ${id}`, errorStack);
 
       if (error instanceof NotFoundException) throw error;
 

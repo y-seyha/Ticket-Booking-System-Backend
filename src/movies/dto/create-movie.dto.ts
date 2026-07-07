@@ -3,14 +3,10 @@ import {
   IsOptional,
   IsInt,
   Min,
-  IsDateString,
-  IsEnum,
-  IsUUID,
   IsDate,
 } from 'class-validator';
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { MovieStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
 
 export class CreateMovieDto {
@@ -50,14 +46,6 @@ export class CreateMovieDto {
   @IsDate()
   releaseDate: Date;
 
-  // @ApiPropertyOptional({
-  //     example: 'b0b3fd29-9b84-4d5e-bdb9-4f4e88f4e7c',
-  //     description: 'Uploaded poster file id',
-  // })
-  // @IsOptional()
-  // @IsUUID()
-  // posterId?: string;
-
   @ApiPropertyOptional({
     example: 'avz06PDqDbM',
     description: 'Youtube Video ID only',
@@ -66,10 +54,5 @@ export class CreateMovieDto {
   @IsString()
   trailerYoutubeId?: string;
 
-  // @ApiProperty({
-  //   enum: MovieStatus,
-  //   example: MovieStatus.COMING_SOON,
-  // })
-  // @IsEnum(MovieStatus)
-  // status: MovieStatus;
 }
+

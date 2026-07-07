@@ -11,6 +11,10 @@ export class CreateScreenDto {
   @IsUUID()
   templateId: string;
 
+  @ApiProperty({ example: 'layout-variant-id' })
+  @IsUUID()
+  layoutId: string;
+
   @ApiProperty({ example: 'Screen 1' })
   @IsString()
   @IsNotEmpty()

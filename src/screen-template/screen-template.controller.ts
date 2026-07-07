@@ -20,8 +20,8 @@ import { ScreenTemplateService } from './screen-template.service';
 import { CreateScreenTemplateDto } from './dto/create-screen-template.dto';
 import { UpdateScreenTemplateDto } from './dto/update-screen-template.dto';
 import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
-import {Roles} from "../authentication/decorators/role.decorator";
-import {Role} from "@prisma/client";
+import { Roles } from '../authentication/decorators/role.decorator';
+import { Role } from '@prisma/client';
 
 @Roles(Role.ADMIN)
 @ApiTags('Screen Templates')

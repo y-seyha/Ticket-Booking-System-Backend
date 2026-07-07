@@ -32,7 +32,7 @@ import { MovieQueryDto } from './dto/ movie-query.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../authentication/decorators/current-user.decorator';
 import { memoryStorage } from 'multer';
-import {UpdateMovieStatusDto} from "./dto/update-status.dto";
+import { UpdateMovieStatusDto } from './dto/update-status.dto';
 
 @ApiTags('Movies')
 @Controller('movies')
@@ -62,10 +62,7 @@ export class MoviesController {
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Manually update movie status (Admin only)' })
-  updateStatus(
-      @Param('id') id: string,
-      @Body() dto: UpdateMovieStatusDto,
-  ) {
+  updateStatus(@Param('id') id: string, @Body() dto: UpdateMovieStatusDto) {
     return this.moviesService.updateStatus(id, dto.status);
   }
 

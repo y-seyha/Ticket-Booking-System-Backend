@@ -8,7 +8,6 @@ import {
   Query,
   UseInterceptors,
   Req,
-  Param,
 } from '@nestjs/common';
 import type { Response } from 'express';
 
@@ -38,6 +37,10 @@ import { ReactivateAccountDto } from './dto/reactivate-account.dto';
 @Controller('auth')
 export class AuthenticationController {
   constructor(private auth: AuthenticationService) {}
+
+  private getFrontendUrl(): string {
+    return process.env.FRONTEND_URL || 'http://localhost:3001';
+  }
 
   @Post('register')
   @ApiOperation({ summary: 'Register a new user account' })
@@ -162,18 +165,26 @@ export class AuthenticationController {
   @Get('verify-email')
   @ApiOperation({ summary: 'Verify email using token' })
   @ApiQuery({ name: 'token', required: true })
-  @ApiResponse({ status: 200, description: 'Email verified successfully' })
-  async verifyEmail(@Query('token') token: string, @Res() res: Response) {
-    await this.auth.verifyEmail(token);
+  @ApiResponse({ status: 200, description: 'Email verified successfully and logged in' })
+  async verifyEmail(
+      @Query('token') token: string,
+      @Req() req: any,
+      @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.auth.verifyEmail(token);
 
-    return res.send(`
-            <html>
-              <body style="font-family:Arial;text-align:center;padding:50px;">
-                <h2>Email Verified Successfully</h2>
-                <p>You can now log in to your account.</p>
-              </body>
-            </html>
-        `);
+    const tokens = await this.auth.issueTokens(result.account, req, {
+      userAgent: req.headers['user-agent'],
+      ip: req.ip,
+    });
+
+    this.setCookies(res, tokens);
+
+    return {
+      success: true,
+      message: 'Email verified and logged in successfully',
+      user: tokens.user,
+    };
   }
 
   @Get('me')
@@ -202,26 +213,24 @@ export class AuthenticationController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleCallback(
-    @Req() req: any,
-    @Res({ passthrough: true }) res: Response,
+      @Req() req: any,
+      @Res({ passthrough: true }) res: Response,
   ) {
     const account = await this.auth.validateOAuthLogin(req.user);
 
-    const tokens = await this.auth.issueTokens(account, req, {
+    const result = await this.auth.handlePostLoginState(account, req, {
       userAgent: req.headers['user-agent'],
       ip: req.ip,
     });
 
-    this.setCookies(res, tokens);
+    const frontendUrl = this.getFrontendUrl();
 
-    // return res.redirect('http://localhost:3000');
+    if ('requiresTwoFactor' in result) {
+      return res.redirect(`${frontendUrl}/auth/verify-2fa?tempToken=${result.tempToken}`);
+    }
 
-    return {
-      success: true,
-      message: 'Google login successful',
-      user: tokens.user,
-      accessToken: tokens.accessToken,
-    };
+    this.setCookies(res, result);
+    return res.redirect(`${frontendUrl}/auth/oauth-success`);
   }
 
   @Get('github')
@@ -231,26 +240,24 @@ export class AuthenticationController {
   @Get('github/callback')
   @UseGuards(AuthGuard('github'))
   async githubCallback(
-    @Req() req: any,
-    @Res({ passthrough: true }) res: Response,
+      @Req() req: any,
+      @Res({ passthrough: true }) res: Response,
   ) {
     const account = await this.auth.validateOAuthLogin(req.user);
 
-    const tokens = await this.auth.issueTokens(account, req, {
+    const result = await this.auth.handlePostLoginState(account, req, {
       userAgent: req.headers['user-agent'],
       ip: req.ip,
     });
 
-    this.setCookies(res, tokens);
+    const frontendUrl = this.getFrontendUrl();
 
-    // return res.redirect('http://localhost:3000');
+    if ('requiresTwoFactor' in result) {
+      return res.redirect(`${frontendUrl}/auth/verify-2fa?tempToken=${result.tempToken}`);
+    }
 
-    return {
-      success: true,
-      message: 'Github login successful',
-      user: tokens.user,
-      accessToken: tokens.accessToken,
-    };
+    this.setCookies(res, result);
+    return res.redirect(`${frontendUrl}/auth/oauth-success`);
   }
 
   @Get('facebook')
@@ -260,26 +267,24 @@ export class AuthenticationController {
   @Get('facebook/callback')
   @UseGuards(AuthGuard('facebook'))
   async facebookCallback(
-    @Req() req: any,
-    @Res({ passthrough: true }) res: Response,
+      @Req() req: any,
+      @Res({ passthrough: true }) res: Response,
   ) {
     const account = await this.auth.validateOAuthLogin(req.user);
 
-    const tokens = await this.auth.issueTokens(account, req, {
+    const result = await this.auth.handlePostLoginState(account, req, {
       userAgent: req.headers['user-agent'],
       ip: req.ip,
     });
 
-    this.setCookies(res, tokens);
+    const frontendUrl = this.getFrontendUrl();
 
-    // return res.redirect('http://localhost:3000');
+    if ('requiresTwoFactor' in result) {
+      return res.redirect(`${frontendUrl}/auth/verify-2fa?tempToken=${result.tempToken}`);
+    }
 
-    return {
-      success: true,
-      message: 'Facebook login successful',
-      user: tokens.user,
-      accessToken: tokens.accessToken,
-    };
+    this.setCookies(res, result);
+    return res.redirect(`${frontendUrl}/auth/oauth-success`);
   }
 
   @Get('discord')
@@ -289,26 +294,24 @@ export class AuthenticationController {
   @Get('discord/callback')
   @UseGuards(AuthGuard('discord'))
   async discordCallback(
-    @Req() req: any,
-    @Res({ passthrough: true }) res: Response,
+      @Req() req: any,
+      @Res({ passthrough: true }) res: Response,
   ) {
     const account = await this.auth.validateOAuthLogin(req.user);
 
-    const tokens = await this.auth.issueTokens(account, req, {
+    const result = await this.auth.handlePostLoginState(account, req, {
       userAgent: req.headers['user-agent'],
       ip: req.ip,
     });
 
-    this.setCookies(res, tokens);
+    const frontendUrl = this.getFrontendUrl();
 
-    // return res.redirect('http://localhost:3000');
+    if ('requiresTwoFactor' in result) {
+      return res.redirect(`${frontendUrl}/auth/verify-2fa?tempToken=${result.tempToken}`);
+    }
 
-    return {
-      success: true,
-      message: 'Discord login successful',
-      user: tokens.user,
-      accessToken: tokens.accessToken,
-    };
+    this.setCookies(res, result);
+    return res.redirect(`${frontendUrl}/auth/oauth-success`);
   }
 
   private setCookies(res: Response, tokens: any) {

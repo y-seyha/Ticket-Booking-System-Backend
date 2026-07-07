@@ -7,7 +7,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AccountStatus, Role, Account, UserProfile } from '@prisma/client';
+import {AccountStatus, Role, Account, UserProfile, UserProfileStatus} from '@prisma/client';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UploadFolder } from '../file-upload/dto/upload-file.dto';
 import { FileUploadService } from '../file-upload/file-upload.service';
@@ -23,14 +23,20 @@ export class UserService {
   ) {}
 
   async getMyProfile(
-    accountId: string,
-  ): Promise<Account & { profile: UserProfile | null }> {
+      accountId: string,
+  ): Promise<Account & { profile: (UserProfile & { avatar: File | null }) | null }> {
     try {
       this.logger.log(`Fetching profile for accountId=${accountId}`);
 
       const user = await this.prisma.account.findUnique({
         where: { id: accountId },
-        include: { profile: true },
+        include: {
+          profile: {
+            include: {
+              avatar: true,
+            },
+          },
+        },
       });
 
       if (!user) {
@@ -41,97 +47,69 @@ export class UserService {
       return user;
     } catch (error) {
       this.logger.error(
-        `Failed to fetch profile for ${accountId}`,
-        (error as Error).stack,
+          `Failed to fetch profile for ${accountId}`,
+          (error as Error).stack,
       );
       throw error;
     }
   }
 
-  async updateProfile(
+
+async updateProfile(
     accountId: string,
     dto: UpdateProfileDto,
     file?: Express.Multer.File,
-  ): Promise<UserProfile> {
-    try {
-      this.logger.log(`Updating profile for accountId=${accountId}`);
+): Promise<UserProfile> {
+  try {
+    this.logger.log(`Updating profile for accountId=${accountId}`);
 
-      const profile = await this.prisma.userProfile.findUnique({
-        where: { accountId },
-        include: { avatar: true },
-      });
+    // Fix: explicitly type this as your Prisma entity model type
+    let avatarFile: File | null = null;
 
-      if (!profile) {
-        this.logger.warn(`Profile not found: ${accountId}`);
-        throw new NotFoundException('Profile not found');
-      }
+if (file) {
+  this.logger.log(`Uploading avatar for accountId=${accountId}`);
 
-      let avatarFile: File | null = null;
+  avatarFile = await this.fileUploadService.uploadFile(
+      file,
+      {
+        folder: UploadFolder.AVATARS,
+        description: 'User Avatar',
+      },
+      accountId,
+  );
+}
 
-      if (file) {
-        this.logger.log(`Uploading new avatar for accountId=${accountId}`);
+const updated = await this.prisma.userProfile.upsert({
+  where: { accountId },
+  create: {
+    accountId,
+    firstName: dto.firstName ?? '',
+    lastName: dto.lastName ?? '',
+    phone: dto.phone ?? null,
+    status: UserProfileStatus.ACTIVE,
+    ...(avatarFile && { avatarId: avatarFile.id }),
+  },
+  update: {
+    ...(dto.firstName !== undefined && { firstName: dto.firstName }),
+    ...(dto.lastName !== undefined && { lastName: dto.lastName }),
+    ...(dto.phone !== undefined && { phone: dto.phone }),
+    ...(avatarFile && { avatarId: avatarFile.id }),
+  },
+  include: {
+    avatar: true,
+  },
+});
 
-        avatarFile = await this.fileUploadService.uploadFile(
-          file,
-          {
-            folder: UploadFolder.AVATARS,
-            description: 'User Avatar',
-          },
-          accountId,
-        );
-
-        if (profile.avatarId) {
-          this.logger.log(`Removing old avatar ${profile.avatarId}`);
-
-          const oldAvatar = await this.prisma.file.findUnique({
-            where: { id: profile.avatarId },
-          });
-
-          if (oldAvatar) {
-            await this.fileUploadService['cloudinary'].deleteFile(
-              oldAvatar.publicId,
-            );
-
-            await this.prisma.file.delete({
-              where: { id: oldAvatar.id },
-            });
-
-            this.logger.log(`Old avatar removed successfully`);
-          }
-        }
-      }
-
-      const updated = await this.prisma.userProfile.update({
-        where: { accountId },
-        data: {
-          firstName: dto.firstName,
-          lastName: dto.lastName,
-          phone: dto.phone,
-          ...(avatarFile && {
-            avatarId: avatarFile.id,
-          }),
-        },
-        include: {
-          avatar: true,
-        },
-      });
-
-      this.logger.log(`Profile updated successfully: ${accountId}`);
-
-      return updated;
-    } catch (error) {
-      this.logger.error(
-        `Failed to update profile for ${accountId}`,
-        (error as Error).stack,
-      );
-
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-
-      throw new InternalServerErrorException('Failed to update profile');
-    }
-  }
+this.logger.log(`Profile saved successfully: ${accountId}`);
+return updated;
+} catch (error) {
+  this.logger.error(
+      `Failed to update profile for ${accountId}`,
+      (error as Error).stack,
+  );
+  throw new InternalServerErrorException('Failed to update profile');
+}
+}
 
   async disableAccount(accountId: string): Promise<Account> {
     try {
