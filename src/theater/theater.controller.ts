@@ -71,6 +71,15 @@ export class TheaterController {
     return this.theaterService.create(dto, file, user.id);
   }
 
+  @Get(':id/movies')
+  @ApiOperation({ summary: 'Get grouped movie showtimes using Theater ID' })
+  async getTheaterMovies(
+    @Param('id') theaterId: string,
+    @Query('date') date?: string,
+  ) {
+    return this.theaterService.findMoviesByTheaterAndDate(theaterId, date);
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get all theaters with pagination & filters' })
   @ApiResponse({ status: 200, description: 'List of theaters' })

@@ -9,9 +9,11 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateShowtimeDto } from './dto/create-showtime.dto';
+
 import { UpdateShowtimeDto } from './dto/update-showtime.dto';
 import { MovieStatus, ShowtimeStatus } from '@prisma/client';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { CreateBulkScheduleDto } from './dto/create-bulk-showtime.dto';
 
 @Injectable()
 export class ShowtimeService {
@@ -85,6 +87,160 @@ export class ShowtimeService {
     }
   }
 
+  async createBulkSchedule(dto: CreateBulkScheduleDto) {
+    try {
+      const movie = await this.prisma.movie.findUnique({
+        where: { id: dto.movieId },
+      });
+      if (!movie) throw new NotFoundException('Movie not found');
+
+      const buffer = dto.cleaningBufferMinutes ?? 15;
+
+      const slotsToCreate: Array<{
+        movieId: string;
+        screenId: string;
+        startTime: Date;
+        endTime: Date;
+        basePrice: number;
+        status: ShowtimeStatus;
+      }> = [];
+
+      const executionSummaryItems: Array<{
+        id: string;
+        date: string;
+        slot: string;
+        theater: string;
+        screen: string;
+      }> = [];
+
+      const now = new Date();
+
+      for (const rawDate of dto.targetDates) {
+        const [year, month, day] = rawDate.split('-').map(Number);
+
+        if (isNaN(year) || isNaN(month) || isNaN(day)) {
+          throw new BadRequestException(`Invalid date item parsed: ${rawDate}`);
+        }
+
+        for (const screenId of dto.screenIds) {
+          const screen = await this.prisma.screen.findUnique({
+            where: { id: screenId },
+            include: { theater: true },
+          });
+          if (!screen) continue;
+
+          for (const slot of dto.dailySlots) {
+            const [hours, minutes] = slot.split(':').map(Number);
+
+            const localStart = new Date(
+              Date.UTC(year, month - 1, day, hours, minutes, 0, 0),
+            );
+            localStart.setUTCHours(localStart.getUTCHours() - 7);
+
+            // Skip past slots quietly, or throw an error if you want to block past scheduling too
+            if (localStart < now) {
+              continue;
+            }
+
+            const actualMovieEnd = new Date(
+              localStart.getTime() + movie.durationMinutes * 60000,
+            );
+
+            const conflictThresholdEnd = new Date(
+              actualMovieEnd.getTime() + buffer * 60000,
+            );
+
+            // Collision overlap validation check
+            const conflict = await this.prisma.showtime.findFirst({
+              where: {
+                screenId: screenId,
+                status: ShowtimeStatus.SCHEDULED,
+                AND: [
+                  { startTime: { lt: conflictThresholdEnd } },
+                  { endTime: { gt: localStart } },
+                ],
+              },
+              include: {
+                movie: { select: { title: true } },
+              },
+            });
+
+           if (conflict) {
+              throw new BadRequestException({
+                error: 'Schedule Conflict Detected',
+                message: `Cannot schedule "${movie.title}" at ${slot} on ${rawDate} inside ${screen.theater.name} (${screen.name}). This slot conflicts with an existing screening of "${conflict.movie.title}".`,
+              });
+            }
+
+            // Queue for database insertion if this slot is safe
+            slotsToCreate.push({
+              movieId: dto.movieId,
+              screenId: screenId,
+              startTime: localStart,
+              endTime: actualMovieEnd,
+              basePrice: dto.basePrice,
+              status: ShowtimeStatus.SCHEDULED,
+            });
+          }
+        }
+      }
+
+      if (slotsToCreate.length === 0) {
+        throw new BadRequestException(
+          'No valid upcoming time slots were generated.',
+        );
+      }
+
+      const createdItems = await this.prisma.$transaction(
+        slotsToCreate.map((data) =>
+          this.prisma.showtime.create({
+            data,
+            include: { screen: { include: { theater: true } } },
+          }),
+        ),
+      );
+
+      for (let i = 0; i < createdItems.length; i++) {
+        const item = createdItems[i];
+        const matchingDateString =
+          dto.targetDates[
+            Math.floor(i / (dto.screenIds.length * dto.dailySlots.length))
+          ];
+
+        executionSummaryItems.push({
+          id: item.id,
+          date: item.startTime.toISOString().split('T')[0], // format date boundary
+          slot: dto.dailySlots[i % dto.dailySlots.length],
+          theater: item.screen.theater.name,
+          screen: item.screen.name,
+        });
+      }
+
+      return {
+        message:
+          'Bulk configuration grid generation processing executed fully.',
+        summary: {
+          created: createdItems.length,
+          skippedConflicts: 0,
+          items: executionSummaryItems,
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        'Failed executing multi-dimensional showtime bulk generation grid array processing sequence',
+        error?.stack,
+      );
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      )
+        throw error;
+      throw new InternalServerErrorException(
+        'Failed processing bulk scheduling matrix layout configurations',
+      );
+    }
+  }
+
   async findAll() {
     try {
       return await this.prisma.showtime.findMany({
@@ -109,7 +265,21 @@ export class ShowtimeService {
           where: { id },
           include: {
             movie: { include: { poster: true } },
-            screen: { include: { theater: true, seats: true } },
+            screen: {
+              include: {
+                theater: true,
+                seats: true,
+                template: {
+                  include: {
+                    layouts: {
+                      include: {
+                        seats: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         }),
         this.prisma.seatPricingRule.findMany({
@@ -139,25 +309,47 @@ export class ShowtimeService {
       const lockedSeatSet = new Set(seatLocks.map((l) => l.seatId));
       const bookedSeatSet = new Set(bookingSeats.map((b) => b.seatId));
 
-      const seats = showtime.screen.seats.map((seat) => {
-        let status: 'AVAILABLE' | 'LOCKED' | 'BOOKED' = 'AVAILABLE';
-        if (bookedSeatSet.has(seat.id)) {
-          status = 'BOOKED';
-        } else if (lockedSeatSet.has(seat.id)) {
-          status = 'LOCKED';
-        }
+      const dynamicPhysicalSeatsMap = new Map(
+        showtime.screen.seats.map((seat) => {
+          let status: 'AVAILABLE' | 'LOCKED' | 'BOOKED' = 'AVAILABLE';
+          if (bookedSeatSet.has(seat.id)) {
+            status = 'BOOKED';
+          } else if (lockedSeatSet.has(seat.id)) {
+            status = 'LOCKED';
+          }
 
-        return {
-          id: seat.id,
-          seatRow: seat.seatRow,
-          seatNumber: seat.seatNumber,
-          posX: seat.posX,
-          posY: seat.posY,
-          seatType: seat.seatType,
-          status,
-          surcharge: pricingMap[seat.seatType] ?? 0,
-        };
-      });
+          return [
+            `${seat.seatRow}-${seat.seatNumber}`,
+            {
+              id: seat.id,
+              status,
+              surcharge: pricingMap[seat.seatType] ?? 0,
+            },
+          ];
+        }),
+      );
+
+      const structuredLayouts = showtime.screen.template.layouts.map(
+        (layout) => ({
+          id: layout.id,
+          name: layout.name,
+          seats: layout.seats.map((templateSeat) => {
+            const matchKey = `${templateSeat.seatRow}-${templateSeat.seatNumber}`;
+            const physicalSeatDetails = dynamicPhysicalSeatsMap.get(matchKey);
+
+            return {
+              id: physicalSeatDetails?.id || templateSeat.id,
+              seatRow: templateSeat.seatRow,
+              seatNumber: templateSeat.seatNumber,
+              posX: templateSeat.posX,
+              posY: templateSeat.posY,
+              seatType: templateSeat.seatType,
+              status: physicalSeatDetails?.status || 'AVAILABLE',
+              surcharge: physicalSeatDetails?.surcharge || 0,
+            };
+          }),
+        }),
+      );
 
       return {
         id: showtime.id,
@@ -169,13 +361,21 @@ export class ShowtimeService {
         status: showtime.status,
         createdAt: showtime.createdAt,
         updatedAt: showtime.updatedAt,
-        movie: showtime.movie,
+        movie: {
+          ...showtime.movie,
+          poster: showtime.movie.poster?.url || null,
+        },
         screen: {
           id: showtime.screen.id,
           name: showtime.screen.name,
           type: showtime.screen.type,
           theater: showtime.screen.theater,
-          seats,
+          screenTemplate: {
+            id: showtime.screen.template.id,
+            name: showtime.screen.template.name,
+            screenSurcharge: showtime.screen.template.screenSurcharge,
+            layouts: structuredLayouts,
+          },
         },
       };
     } catch (error) {
@@ -255,11 +455,20 @@ export class ShowtimeService {
   async remove(id: string) {
     try {
       await this.findOne(id);
-      return await this.prisma.showtime.delete({ where: { id } });
+
+      return await this.prisma.showtime.update({
+        where: { id },
+        data: { status: ShowtimeStatus.CANCELLED },
+      });
     } catch (error) {
-      this.logger.error('Failed to delete showtime', error?.stack);
+      this.logger.error(
+        'Failed to cancel showtime listing instance',
+        error?.stack,
+      );
       if (error instanceof NotFoundException) throw error;
-      throw new InternalServerErrorException('Failed to delete showtime');
+      throw new InternalServerErrorException(
+        'Failed to cancel showtime listing instance',
+      );
     }
   }
 
@@ -270,15 +479,59 @@ export class ShowtimeService {
           'Status and date query parameters are required',
         );
       }
-      const baseDateStart = new Date(dateStr);
-      if (isNaN(baseDateStart.getTime())) {
+
+      let year: number;
+      let month: number;
+      let day: number;
+
+      // Explicitly check for the 'YYYY-MM-DD' format first to prevent Date.parse() hijacking
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        const [y, m, d] = dateStr.split('-').map(Number);
+        year = y;
+        month = m;
+        day = d;
+      }
+      //  Fallback to ISO/UTC parsing only if the format isn't simple YYYY-MM-DD
+      else if (dateStr.includes('T') || !isNaN(Date.parse(dateStr))) {
+        const utcDate = new Date(dateStr);
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'Asia/Phnom_Penh',
+          year: 'numeric',
+          month: 'numeric',
+          day: 'numeric',
+        });
+        const parts = formatter.formatToParts(utcDate);
+        year = Number(parts.find((p) => p.type === 'year')?.value);
+        month = Number(parts.find((p) => p.type === 'month')?.value);
+        day = Number(parts.find((p) => p.type === 'day')?.value);
+      } else {
         throw new BadRequestException('Invalid date format provided');
       }
 
-      const startOfDay = new Date(new Date(baseDateStart).setHours(0, 0, 0, 0));
+      if (isNaN(year) || isNaN(month) || isNaN(day)) {
+        throw new BadRequestException('Invalid date fields parsed');
+      }
+
+      //  Set precise boundaries using local hours adjustment
+      // Using UTC date and subtracting 7 hours ensures full day coverage (00:00:00 to 23:59:59 local)
+      const startOfDay = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+      startOfDay.setHours(startOfDay.getHours() - 7);
+
       const endOfDay = new Date(
-        new Date(baseDateStart).setHours(23, 59, 59, 999),
+        Date.UTC(year, month - 1, day, 23, 59, 59, 999),
       );
+      endOfDay.setHours(endOfDay.getHours() - 7);
+
+      const isComingSoon = status === MovieStatus.COMING_SOON;
+
+      const timeCondition = isComingSoon
+        ? { startTime: { gte: startOfDay } }
+        : {
+            startTime: {
+              gte: startOfDay,
+              lte: endOfDay,
+            },
+          };
 
       const moviesWithShowtimes = await this.prisma.movie.findMany({
         where: {
@@ -286,10 +539,7 @@ export class ShowtimeService {
           showtimes: {
             some: {
               status: ShowtimeStatus.SCHEDULED,
-              startTime: {
-                gte: startOfDay,
-                lte: endOfDay,
-              },
+              ...timeCondition,
             },
           },
         },
@@ -298,10 +548,7 @@ export class ShowtimeService {
           showtimes: {
             where: {
               status: ShowtimeStatus.SCHEDULED,
-              startTime: {
-                gte: startOfDay,
-                lte: endOfDay,
-              },
+              ...timeCondition,
             },
             include: {
               screen: {
@@ -348,15 +595,11 @@ export class ShowtimeService {
     }
   }
 
-  //Cron Job
   @Cron(CronExpression.EVERY_MINUTE)
   async handlePastShowtimes() {
-    this.logger.log('Executing automated sweep for historical showtime slots...');
-
     try {
       const now = new Date();
 
-      // Update any SCHEDULED showtime whose endTime is now in the past
       const updateResult = await this.prisma.showtime.updateMany({
         where: {
           status: ShowtimeStatus.SCHEDULED,
@@ -382,4 +625,3 @@ export class ShowtimeService {
     }
   }
 }
-

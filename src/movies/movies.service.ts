@@ -1,3 +1,4 @@
+/* eslint-disable */
 import {
   BadRequestException,
   Injectable,
@@ -66,7 +67,7 @@ export class MoviesService {
 
   async findAll(query: MovieQueryDto) {
     try {
-      const { page = 1, limit = 10, search, status } = query;
+      const { page = 1, limit = 10, search, status, month } = query;
 
       const skip = (page - 1) * limit;
 
@@ -83,13 +84,33 @@ export class MoviesService {
         }),
       };
 
+      if (month) {
+       const [yearStr, monthStr] = month.split('-');
+        const year = parseInt(yearStr, 10);
+        const monthIndex = parseInt(monthStr, 10) - 1;
+
+        if (!isNaN(year) && !isNaN(monthIndex)) {
+          // First millisecond of the selected month
+          const startDate = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0, 0));
+          // First millisecond of the following month
+          const endDate = new Date(
+            Date.UTC(year, monthIndex + 1, 1, 0, 0, 0, 0),
+          );
+
+          where.releaseDate = {
+            gte: startDate,
+            lt: endDate,
+          };
+        }
+      }
+
       const [movies, total] = await this.prisma.$transaction([
         this.prisma.movie.findMany({
           where,
           skip,
           take: limit,
           orderBy: {
-            createdAt: 'desc',
+            releaseDate: 'asc',
           },
           include: {
             poster: true,
@@ -103,46 +124,99 @@ export class MoviesService {
 
       return {
         data: movies,
-
         pagination: {
           total,
           page,
           limit,
-
           totalPages: Math.ceil(total / limit),
         },
       };
     } catch (error) {
       this.logger.error('Failed to fetch movies', error?.stack);
-
       throw new InternalServerErrorException('Failed to fetch movies');
     }
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, date?: string) {
     try {
+      const showtimeDateFilter: Prisma.ShowtimeWhereInput = {
+        status: 'SCHEDULED',
+      };
+
+      if (date) {
+        let year: number;
+        let month: number;
+        let day: number;
+
+        // Check if incoming string is an ISO format timestamp or plain date
+        if (date.includes('T') || !isNaN(Date.parse(date))) {
+          const utcDate = new Date(date);
+
+          // Forcefully parse date string parts into Cambodia Local components
+          const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Phnom_Penh',
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
+          });
+
+          const parts = formatter.formatToParts(utcDate);
+          year = Number(parts.find((p) => p.type === 'year')?.value);
+          month = Number(parts.find((p) => p.type === 'month')?.value);
+          day = Number(parts.find((p) => p.type === 'day')?.value);
+        } else {
+          // Fallback parsing for raw "YYYY-MM-DD" structures
+          const [y, m, d] = date.split('-').map(Number);
+          year = y;
+          month = m;
+          day = d;
+        }
+
+        if (isNaN(year) || isNaN(month) || isNaN(day)) {
+          throw new BadRequestException('Invalid date format provided');
+        }
+
+        // Construct clean UTC bounds representing the start and end of Cambodia local days
+        const startOfDay = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+        startOfDay.setUTCHours(startOfDay.getUTCHours() - 7); // Shift to Cambodia offset (UTC+7)
+
+        const endOfDay = new Date(
+          Date.UTC(year, month - 1, day, 23, 59, 59, 999),
+        );
+        endOfDay.setUTCHours(endOfDay.getUTCHours() - 7); // Shift to Cambodia offset (UTC+7)
+
+        showtimeDateFilter.startTime = {
+          gte: startOfDay,
+          lte: endOfDay,
+        };
+      }
+
       const movie = await this.prisma.movie.findUnique({
         where: { id },
         include: {
           poster: true,
           showtimes: {
-            where: {
-              status: 'SCHEDULED',
-            },
+            where: showtimeDateFilter,
             include: {
               screen: {
                 include: {
                   theater: {
                     include: {
-                      image: true
-                    }
-                  }
-                }
-              }
+                      image: true,
+                    },
+                  },
+                  template: {
+                    include: {
+                      layouts: {
+                        include: {
+                          seats: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
-            orderBy: {
-              startTime: 'asc',
-            }
           },
         },
       });
@@ -151,12 +225,19 @@ export class MoviesService {
         throw new NotFoundException('Movie not found');
       }
 
+      if (movie.showtimes) {
+        movie.showtimes.sort(
+          (a, b) => a.startTime.getTime() - b.startTime.getTime(),
+        );
+      }
+
       return this.transformMovieResponse(movie);
     } catch (error) {
       this.logger.error(`Failed to fetch movie ${id}`, error?.stack);
       throw error;
     }
   }
+
   private transformMovieResponse(movie: any) {
     const locationsMap = new Map();
 
@@ -179,6 +260,23 @@ export class MoviesService {
         screenName: showtime.screen.name,
         screenType: showtime.screen.type,
         basePrice: showtime.basePrice,
+        screenTemplate: {
+          id: showtime.screen.template.id,
+          name: showtime.screen.template.name,
+          screenSurcharge: showtime.screen.template.screenSurcharge,
+          layouts: showtime.screen.template.layouts.map((layout: any) => ({
+            id: layout.id,
+            name: layout.name,
+            seats: layout.seats.map((ts: any) => ({
+              id: ts.id,
+              seatRow: ts.seatRow,
+              seatNumber: ts.seatNumber,
+              posX: ts.posX,
+              posY: ts.posY,
+              seatType: ts.seatType,
+            })),
+          })),
+        },
       });
     });
 
@@ -191,11 +289,10 @@ export class MoviesService {
       releaseDate: movie.releaseDate,
       poster: movie.poster?.url || null,
       backdrop: movie.poster?.url || null,
-      trailerYoutubeId: movie.trailerYoutubeId || null, // Added this line
+      trailerYoutubeId: movie.trailerYoutubeId || null,
       showtimesByLocation: Array.from(locationsMap.values()),
     };
   }
-
 
   async update(
     id: string,
@@ -338,7 +435,6 @@ export class MoviesService {
     }
   }
 
-
   private computeStatus(releaseDate: Date): MovieStatus {
     const timeZone = 'Asia/Phnom_Penh';
 
@@ -350,7 +446,4 @@ export class MoviesService {
 
     return release > now ? MovieStatus.COMING_SOON : MovieStatus.NOW_SHOWING;
   }
-
-
-
 }

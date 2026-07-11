@@ -24,12 +24,34 @@ import { UpdateShowtimeDto } from './dto/update-showtime.dto';
 import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
 import { RolesGuard } from '../authentication/guards/roles.guard';
 import { Roles } from '../authentication/decorators/role.decorator';
+import { CreateBulkScheduleDto } from './dto/create-bulk-showtime.dto';
 
 @ApiTags('Showtimes')
 @ApiBearerAuth()
 @Controller('showtimes')
 export class ShowtimeController {
   constructor(private readonly showtimeService: ShowtimeService) {}
+
+  @Post('bulk')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Bulk generate showtime matrix (Admin only)' })
+  @ApiResponse({
+    status: 201,
+    description: 'Bulk schedule generated successfully.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid date parameters or inputs provided.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Target movie metadata profile entity not found.',
+  })
+  async createBulk(@Body() dto: CreateBulkScheduleDto) {
+    return this.showtimeService.createBulkSchedule(dto);
+  }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -53,10 +75,12 @@ export class ShowtimeController {
   }
 
   @Get('active/listings')
-  @ApiOperation({ summary: 'Get active grouped showtimes filtered by status and date' })
+  @ApiOperation({
+    summary: 'Get active grouped showtimes filtered by status and date',
+  })
   findActiveListings(
-      @Query('status') status: MovieStatus,
-      @Query('date') dateStr: string, // Expecting ISO string or YYYY-MM-DD
+    @Query('status') status: MovieStatus,
+    @Query('date') dateStr: string,
   ) {
     return this.showtimeService.findActiveListings(status, dateStr);
   }

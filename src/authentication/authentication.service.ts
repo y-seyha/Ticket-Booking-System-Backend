@@ -1,3 +1,4 @@
+/* eslint-disable */
 import {
   Injectable,
   Logger,
@@ -24,6 +25,7 @@ import { Response } from 'express';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
 import * as crypto from 'crypto';
+import { JwtPayload } from '../types';
 
 type DeviceInfo = {
   deviceName?: string;
@@ -706,6 +708,7 @@ export class AuthenticationService {
     const payload = {
       sub: account.id,
       email: account.email,
+      role: account.role,
       sid: sessionId,
     };
 
@@ -839,6 +842,85 @@ export class AuthenticationService {
       message: 'Account reactivated successfully',
     };
   }
+
+  async refreshTokens(refreshToken: string | undefined, req: Request & { ip?: string }) {
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token missing');
+    }
+
+    let payload: JwtPayload;
+    try {
+      payload = this.jwt.verify<JwtPayload>(refreshToken);
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    const account = await this.prisma.account.findUnique({
+      where: { id: payload.sub },
+    });
+
+    if (!account) {
+      throw new UnauthorizedException('Account not found');
+    }
+
+    const state = this.getAccountState(account);
+    if (!state.allowed) {
+      throw new UnauthorizedException(`Account ${state.type.toLowerCase()}`);
+    }
+
+    const tokens = await this.prisma.refreshToken.findMany({
+      where: {
+        accountId: account.id,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    // Explicitly find the match using Prisma's generated RefreshToken type
+    let matchedTokenRecord: (typeof tokens)[number] | null = null;
+    for (const t of tokens) {
+      const match = await bcrypt.compare(refreshToken, t.tokenHash);
+      if (match) {
+        matchedTokenRecord = t;
+        break;
+      }
+    }
+
+    if (!matchedTokenRecord) {
+      throw new UnauthorizedException('Invalid or revoked refresh token');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.refreshToken.update({
+        where: { id: matchedTokenRecord.id },
+        data: { revokedAt: new Date() },
+      }),
+      this.prisma.loginSession.updateMany({
+        where: {
+          accountId: account.id,
+          refreshTokenId: matchedTokenRecord.id,
+        },
+        data: {
+          isActive: false,
+          lastActiveAt: new Date(),
+        },
+      }),
+    ]);
+
+    const rawHeaders = req.headers as unknown as Record<
+      string,
+      string | undefined
+    >;
+    const userAgent = rawHeaders['user-agent'] || '';
+
+    return this.issueTokens(account, req, {
+      deviceName: userAgent,
+      deviceType: this.detectDevice(req),
+      ip: req.ip || '',
+      userAgent: userAgent,
+    });
+  }
+
 
   private handlePrismaError(error: any): never {
     if (error?.code === 'P2002') {

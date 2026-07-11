@@ -5,17 +5,90 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-
 import { BookingStatus, PaymentProvider, PaymentStatus } from '@prisma/client';
-
 import { PrismaService } from '../prisma/prisma.service';
-import { PayDto } from './dto/pay.dto';
+import {
+  PayDto,
+  UpdatePaymentMethodDto,
+  CheckoutResponseDto,
+} from '../checkout/dto/create-checkout.dto';
 
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
 
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Allows the customer to alter their payment option dynamically while
+   * viewing their active checkout summary screen.
+   */
+  async changePaymentMethod(
+    accountId: string,
+    paymentId: string,
+    dto: UpdatePaymentMethodDto,
+  ): Promise<CheckoutResponseDto> {
+    try {
+      const payment = await this.prisma.payment.findUnique({
+        where: { id: paymentId },
+        include: { booking: true },
+      });
+
+      if (!payment) {
+        throw new NotFoundException('Payment session not found');
+      }
+
+      if (payment.booking.accountId !== accountId) {
+        throw new BadRequestException('Transaction does not belong to user');
+      }
+
+      if (payment.status !== PaymentStatus.PENDING) {
+        throw new BadRequestException('Payment configuration is closed');
+      }
+
+      const now = new Date();
+      if (payment.expiresAt && payment.expiresAt < now) {
+        throw new BadRequestException('Payment session expired');
+      }
+
+      const updatedPayment = await this.prisma.payment.update({
+        where: { id: paymentId },
+        data: { provider: dto.paymentProvider },
+        include: { booking: true },
+      });
+
+      let qrCode: string | undefined;
+      let paymentUrl: string | undefined;
+
+      if (dto.paymentProvider === PaymentProvider.KHQR) {
+        qrCode = `00020101021252040000...updated-khqr-for-${updatedPayment.booking.bookingCode}`;
+      } else if (dto.paymentProvider === PaymentProvider.STRIPE) {
+        paymentUrl = `https://checkout.stripe.com/pay/mock_session_${updatedPayment.id}`;
+      }
+
+      return {
+        bookingId: updatedPayment.bookingId,
+        bookingCode: updatedPayment.booking.bookingCode,
+        totalAmount: Number(updatedPayment.amount),
+        bookingStatus: updatedPayment.booking.status,
+        paymentId: updatedPayment.id,
+        paymentProvider: updatedPayment.provider,
+        paymentStatus: updatedPayment.status,
+        paymentExpiresAt: updatedPayment.expiresAt,
+        qrCode,
+        paymentUrl,
+      };
+    } catch (error) {
+      this.logger.error(error.message, error.stack);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to update payment method');
+    }
+  }
 
   async payCash(accountId: string, dto: PayDto) {
     try {
@@ -110,15 +183,10 @@ export class PaymentService {
 
       return {
         message: 'Cash payment completed successfully',
-
         bookingId: result.updatedBooking.id,
-
         bookingStatus: result.updatedBooking.status,
-
         paymentId: result.updatedPayment.id,
-
         paymentStatus: result.updatedPayment.status,
-
         paidAt: result.updatedPayment.paidAt,
       };
     } catch (error) {

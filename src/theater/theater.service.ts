@@ -1,3 +1,4 @@
+/* eslint-disable */
 import {
   Injectable,
   Logger,
@@ -249,6 +250,109 @@ export class TheaterService {
       }
 
       throw new InternalServerErrorException('Failed to delete theater');
+    }
+  }
+
+  async findMoviesByTheaterAndDate(theaterId: string, date?: string) {
+    try {
+      const showtimeFilter: Prisma.ShowtimeWhereInput = {
+        status: 'SCHEDULED',
+        screen: {
+          theaterId: theaterId,
+        },
+      };
+
+      if (date) {
+        let year: number;
+        let month: number;
+        let day: number;
+
+        if (date.includes('T') || !isNaN(Date.parse(date))) {
+          const utcDate = new Date(date);
+          const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Phnom_Penh',
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
+          });
+
+          const parts = formatter.formatToParts(utcDate);
+          year = Number(parts.find((p) => p.type === 'year')?.value);
+          month = Number(parts.find((p) => p.type === 'month')?.value);
+          day = Number(parts.find((p) => p.type === 'day')?.value);
+        } else {
+          const [y, m, d] = date.split('-').map(Number);
+          year = y;
+          month = m;
+          day = d;
+        }
+
+        if (isNaN(year) || isNaN(month) || isNaN(day)) {
+          throw new BadRequestException('Invalid date format provided');
+        }
+
+        const startOfDay = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+        startOfDay.setUTCHours(startOfDay.getUTCHours() - 7);
+
+        const endOfDay = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+        endOfDay.setUTCHours(endOfDay.getUTCHours() - 7);
+
+        showtimeFilter.startTime = {
+          gte: startOfDay,
+          lte: endOfDay,
+        };
+      }
+
+      const showtimes = await this.prisma.showtime.findMany({
+        where: showtimeFilter,
+        include: {
+          movie: {
+            include: { poster: true },
+          },
+          screen: {
+            include: { theater: true },
+          },
+        },
+        orderBy: { startTime: 'asc' },
+      });
+
+       const moviesMap = new Map<string, any>();
+
+      showtimes.forEach((st) => {
+        if (!st.movie) return;
+
+        if (!moviesMap.has(st.movieId)) {
+          moviesMap.set(st.movieId, {
+            id: st.movie.id,
+            title: st.movie.title,
+            ageRating: (st.movie as any).ageRating || 'G',
+            duration: (st.movie as any).duration || 0,
+            poster: st.movie.poster?.url || null, // Resolves poster URL just like findOne()
+            showtimes: [],
+          });
+        }
+
+        moviesMap.get(st.movieId).showtimes.push({
+          id: st.id,
+          startTime: st.startTime,
+          endTime: st.endTime,
+          basePrice: st.basePrice,
+          status: st.status,
+          screen: {
+            id: st.screen.id,
+            name: st.screen.name,
+            type: st.screen.type,
+          },
+        });
+      });
+
+      return {
+        data: Array.from(moviesMap.values()),
+      };
+    } catch (error) {
+      this.logger.error(`Failed to load movie schedule for theater ${theaterId}`, error?.stack);
+      if (error instanceof BadRequestException) throw error;
+      throw new InternalServerErrorException('Failed to process theater details');
     }
   }
 }

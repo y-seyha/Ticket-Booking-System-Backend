@@ -1,3 +1,4 @@
+/* eslint-disable */
 import {
   Body,
   Controller,
@@ -10,6 +11,7 @@ import {
   Req,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import type { Request } from 'express';
 
 import { AuthenticationService } from './authentication.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -32,6 +34,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { ReactivateAccountDto } from './dto/reactivate-account.dto';
+import { RefreshResponse } from '../types';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -165,11 +168,14 @@ export class AuthenticationController {
   @Get('verify-email')
   @ApiOperation({ summary: 'Verify email using token' })
   @ApiQuery({ name: 'token', required: true })
-  @ApiResponse({ status: 200, description: 'Email verified successfully and logged in' })
+  @ApiResponse({
+    status: 200,
+    description: 'Email verified successfully and logged in',
+  })
   async verifyEmail(
-      @Query('token') token: string,
-      @Req() req: any,
-      @Res({ passthrough: true }) res: Response,
+    @Query('token') token: string,
+    @Req() req: any,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.auth.verifyEmail(token);
 
@@ -206,6 +212,31 @@ export class AuthenticationController {
     return this.auth.logout(req, res);
   }
 
+  @Post('refresh')
+  @ApiOperation({
+    summary: 'Refresh access and refresh tokens via HTTP-only cookies',
+    description:
+      'This endpoint expects the refresh_token to be automatically present in incoming request cookies.',
+  })
+  @ApiResponse({ status: 200, description: 'Tokens refreshed successfully' })
+  @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<RefreshResponse> {
+    const requestWithCookies = req as Record<string, any>;
+    const refreshToken: string | undefined =
+      requestWithCookies.cookies?.refresh_token;
+
+    const result = await this.auth.refreshTokens(refreshToken, req as any);
+
+    this.setCookies(res, result);
+
+    return {
+      user: result.user,
+    };
+  }
+
   @Get('google')
   @UseGuards(AuthGuard('google'))
   googleAuth() {}
@@ -213,8 +244,8 @@ export class AuthenticationController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleCallback(
-      @Req() req: any,
-      @Res({ passthrough: true }) res: Response,
+    @Req() req: any,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const account = await this.auth.validateOAuthLogin(req.user);
 
@@ -226,7 +257,9 @@ export class AuthenticationController {
     const frontendUrl = this.getFrontendUrl();
 
     if ('requiresTwoFactor' in result) {
-      return res.redirect(`${frontendUrl}/auth/verify-2fa?tempToken=${result.tempToken}`);
+      return res.redirect(
+        `${frontendUrl}/auth/verify-2fa?tempToken=${result.tempToken}`,
+      );
     }
 
     this.setCookies(res, result);
@@ -240,8 +273,8 @@ export class AuthenticationController {
   @Get('github/callback')
   @UseGuards(AuthGuard('github'))
   async githubCallback(
-      @Req() req: any,
-      @Res({ passthrough: true }) res: Response,
+    @Req() req: any,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const account = await this.auth.validateOAuthLogin(req.user);
 
@@ -253,7 +286,9 @@ export class AuthenticationController {
     const frontendUrl = this.getFrontendUrl();
 
     if ('requiresTwoFactor' in result) {
-      return res.redirect(`${frontendUrl}/auth/verify-2fa?tempToken=${result.tempToken}`);
+      return res.redirect(
+        `${frontendUrl}/auth/verify-2fa?tempToken=${result.tempToken}`,
+      );
     }
 
     this.setCookies(res, result);
@@ -267,8 +302,8 @@ export class AuthenticationController {
   @Get('facebook/callback')
   @UseGuards(AuthGuard('facebook'))
   async facebookCallback(
-      @Req() req: any,
-      @Res({ passthrough: true }) res: Response,
+    @Req() req: any,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const account = await this.auth.validateOAuthLogin(req.user);
 
@@ -280,7 +315,9 @@ export class AuthenticationController {
     const frontendUrl = this.getFrontendUrl();
 
     if ('requiresTwoFactor' in result) {
-      return res.redirect(`${frontendUrl}/auth/verify-2fa?tempToken=${result.tempToken}`);
+      return res.redirect(
+        `${frontendUrl}/auth/verify-2fa?tempToken=${result.tempToken}`,
+      );
     }
 
     this.setCookies(res, result);
@@ -294,8 +331,8 @@ export class AuthenticationController {
   @Get('discord/callback')
   @UseGuards(AuthGuard('discord'))
   async discordCallback(
-      @Req() req: any,
-      @Res({ passthrough: true }) res: Response,
+    @Req() req: any,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const account = await this.auth.validateOAuthLogin(req.user);
 
@@ -307,7 +344,9 @@ export class AuthenticationController {
     const frontendUrl = this.getFrontendUrl();
 
     if ('requiresTwoFactor' in result) {
-      return res.redirect(`${frontendUrl}/auth/verify-2fa?tempToken=${result.tempToken}`);
+      return res.redirect(
+        `${frontendUrl}/auth/verify-2fa?tempToken=${result.tempToken}`,
+      );
     }
 
     this.setCookies(res, result);

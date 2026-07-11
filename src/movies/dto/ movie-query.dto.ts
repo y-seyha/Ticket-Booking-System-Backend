@@ -1,5 +1,4 @@
 import { IsOptional, IsInt, Min, IsString, IsEnum } from 'class-validator';
-
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { MovieStatus } from '@prisma/client';
@@ -32,4 +31,11 @@ export class MovieQueryDto {
   @IsOptional()
   @IsEnum(MovieStatus)
   status?: MovieStatus;
+
+  @ApiPropertyOptional({
+    example: '2026-08',
+  })
+  @IsOptional()
+  @IsString()
+  month?: string;
 }

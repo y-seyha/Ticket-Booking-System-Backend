@@ -80,8 +80,8 @@ export class MoviesController {
   @ApiOperation({ summary: 'Get movie by ID' })
   @ApiResponse({ status: 200, description: 'Movie found' })
   @ApiResponse({ status: 404, description: 'Movie not found' })
-  findOne(@Param('id') id: string) {
-    return this.moviesService.findOne(id);
+  findOne(@Param('id') id: string, @Query('date') date?: string) {
+    return this.moviesService.findOne(id, date);
   }
 
   @Patch(':id')
