@@ -13,7 +13,6 @@ import {
 import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
 import { CurrentUser } from '../authentication/decorators/current-user.decorator';
 
-
 @ApiTags('Checkout')
 @Controller('checkout')
 export class CheckoutController {

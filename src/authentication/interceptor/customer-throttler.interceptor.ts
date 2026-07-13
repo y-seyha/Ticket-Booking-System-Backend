@@ -4,31 +4,40 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
-import { catchError, tap, throwError } from 'rxjs';
+import { Observable, throwError } from 'rxjs';
+import { catchError, tap } from 'rxjs/operators';
+import { Request } from 'express';
 import { CustomerThrottlerStore } from '../throttler/customer-throttler.store';
+
+interface ThrottleEntry {
+  count: number;
+  lockedUntil: number | undefined;
+}
+
+interface ThrottledRequest extends Request {
+  __throttleKey?: string;
+  __throttleEntry?: ThrottleEntry;
+}
 
 @Injectable()
 export class CustomerThrottlerInterceptor implements NestInterceptor {
   constructor(private store: CustomerThrottlerStore) {}
 
-  intercept(context: ExecutionContext, next: CallHandler) {
-    const req = context.switchToHttp().getRequest();
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const req = context.switchToHttp().getRequest<ThrottledRequest>();
 
     const key = req.__throttleKey;
 
     return next.handle().pipe(
       tap(() => {
-        // if success → reset attempts
         if (key) this.store.reset(key);
       }),
 
-      catchError((err) => {
-        //  failure → increment
+      catchError((err: unknown) => {
         if (key) {
-          const current = this.store.get(key);
+          const current = this.store.get(key) as ThrottleEntry;
 
           const newCount = current.count + 1;
-
           let lockedUntil = current.lockedUntil;
 
           if (newCount >= 3) {

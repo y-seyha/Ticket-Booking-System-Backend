@@ -1,9 +1,19 @@
 import { PassportStrategy } from '@nestjs/passport';
-import { Strategy, VerifyCallback } from 'passport-discord';
+import { Strategy } from 'passport-discord';
 import { Injectable, Logger } from '@nestjs/common';
 
+interface ExplicitDiscordProfile {
+  id: string;
+  username: string;
+  avatar: string | null;
+  email?: string;
+}
+
 @Injectable()
-export class DiscordStrategy extends PassportStrategy(Strategy, 'discord') {
+export class DiscordStrategy extends PassportStrategy(
+  Strategy as any,
+  'discord',
+) {
   private readonly logger = new Logger(DiscordStrategy.name);
 
   constructor() {
@@ -19,16 +29,16 @@ export class DiscordStrategy extends PassportStrategy(Strategy, 'discord') {
     this.logger.log('DiscordStrategy initialized');
   }
 
-  async validate(
+  public validate(
     accessToken: string,
     refreshToken: string,
-    profile: any,
-    done: VerifyCallback,
-  ) {
+    profile: ExplicitDiscordProfile,
+    done: (err: Error | null, user?: unknown) => void,
+  ): void {
     const user = {
       provider: 'DISCORD',
       providerUserId: profile.id,
-      email: profile.email,
+      email: profile.email || null,
       displayName: profile.username,
       avatarUrl: profile.avatar
         ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`
@@ -37,7 +47,7 @@ export class DiscordStrategy extends PassportStrategy(Strategy, 'discord') {
       refreshToken,
     };
 
-    this.logger.log(`Discord OAuth login: ${user.email}`);
+    this.logger.log(`Discord OAuth login: ${user.email ?? 'unknown'}`);
 
     done(null, user);
   }

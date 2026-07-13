@@ -7,7 +7,13 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import {AccountStatus, Role, Account, UserProfile, UserProfileStatus} from '@prisma/client';
+import {
+  AccountStatus,
+  Role,
+  Account,
+  UserProfile,
+  UserProfileStatus,
+} from '@prisma/client';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UploadFolder } from '../file-upload/dto/upload-file.dto';
 import { FileUploadService } from '../file-upload/file-upload.service';
@@ -23,8 +29,10 @@ export class UserService {
   ) {}
 
   async getMyProfile(
-      accountId: string,
-  ): Promise<Account & { profile: (UserProfile & { avatar: File | null }) | null }> {
+    accountId: string,
+  ): Promise<
+    Account & { profile: (UserProfile & { avatar: File | null }) | null }
+  > {
     try {
       this.logger.log(`Fetching profile for accountId=${accountId}`);
 
@@ -47,69 +55,68 @@ export class UserService {
       return user;
     } catch (error) {
       this.logger.error(
-          `Failed to fetch profile for ${accountId}`,
-          (error as Error).stack,
+        `Failed to fetch profile for ${accountId}`,
+        (error as Error).stack,
       );
       throw error;
     }
   }
 
-
-async updateProfile(
+  async updateProfile(
     accountId: string,
     dto: UpdateProfileDto,
     file?: Express.Multer.File,
-): Promise<UserProfile> {
-  try {
-    this.logger.log(`Updating profile for accountId=${accountId}`);
+  ): Promise<UserProfile> {
+    try {
+      this.logger.log(`Updating profile for accountId=${accountId}`);
 
-    // Fix: explicitly type this as your Prisma entity model type
-    let avatarFile: File | null = null;
+      // Fix: explicitly type this as your Prisma entity model type
+      let avatarFile: File | null = null;
 
-if (file) {
-  this.logger.log(`Uploading avatar for accountId=${accountId}`);
+      if (file) {
+        this.logger.log(`Uploading avatar for accountId=${accountId}`);
 
-  avatarFile = await this.fileUploadService.uploadFile(
-      file,
-      {
-        folder: UploadFolder.AVATARS,
-        description: 'User Avatar',
-      },
-      accountId,
-  );
-}
+        avatarFile = await this.fileUploadService.uploadFile(
+          file,
+          {
+            folder: UploadFolder.AVATARS,
+            description: 'User Avatar',
+          },
+          accountId,
+        );
+      }
 
-const updated = await this.prisma.userProfile.upsert({
-  where: { accountId },
-  create: {
-    accountId,
-    firstName: dto.firstName ?? '',
-    lastName: dto.lastName ?? '',
-    phone: dto.phone ?? null,
-    status: UserProfileStatus.ACTIVE,
-    ...(avatarFile && { avatarId: avatarFile.id }),
-  },
-  update: {
-    ...(dto.firstName !== undefined && { firstName: dto.firstName }),
-    ...(dto.lastName !== undefined && { lastName: dto.lastName }),
-    ...(dto.phone !== undefined && { phone: dto.phone }),
-    ...(avatarFile && { avatarId: avatarFile.id }),
-  },
-  include: {
-    avatar: true,
-  },
-});
+      const updated = await this.prisma.userProfile.upsert({
+        where: { accountId },
+        create: {
+          accountId,
+          firstName: dto.firstName ?? '',
+          lastName: dto.lastName ?? '',
+          phone: dto.phone ?? null,
+          status: UserProfileStatus.ACTIVE,
+          ...(avatarFile && { avatarId: avatarFile.id }),
+        },
+        update: {
+          ...(dto.firstName !== undefined && { firstName: dto.firstName }),
+          ...(dto.lastName !== undefined && { lastName: dto.lastName }),
+          ...(dto.phone !== undefined && { phone: dto.phone }),
+          ...(avatarFile && { avatarId: avatarFile.id }),
+        },
+        include: {
+          avatar: true,
+        },
+      });
 
-this.logger.log(`Profile saved successfully: ${accountId}`);
-return updated;
-} catch (error) {
-  this.logger.error(
-      `Failed to update profile for ${accountId}`,
-      (error as Error).stack,
-  );
-  throw new InternalServerErrorException('Failed to update profile');
-}
-}
+      this.logger.log(`Profile saved successfully: ${accountId}`);
+      return updated;
+    } catch (error) {
+      this.logger.error(
+        `Failed to update profile for ${accountId}`,
+        (error as Error).stack,
+      );
+      throw new InternalServerErrorException('Failed to update profile');
+    }
+  }
 
   async disableAccount(accountId: string): Promise<Account> {
     try {

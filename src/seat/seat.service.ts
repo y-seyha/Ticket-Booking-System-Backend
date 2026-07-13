@@ -376,7 +376,6 @@ export class SeatService {
     };
   }
 
-
   async clearMyCart(accountId: string) {
     const result = await this.prisma.seatLock.deleteMany({
       where: { accountId },

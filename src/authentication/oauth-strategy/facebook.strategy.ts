@@ -1,9 +1,22 @@
 import { PassportStrategy } from '@nestjs/passport';
-import { Strategy, VerifyCallback } from 'passport-facebook';
+import { Strategy } from 'passport-facebook';
 import { Injectable, Logger } from '@nestjs/common';
 
+interface ExplicitFacebookProfile {
+  id: string;
+  name?: {
+    givenName?: string;
+    familyName?: string;
+  };
+  emails?: Array<{ value: string }>;
+  photos?: Array<{ value: string }>;
+}
+
 @Injectable()
-export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
+export class FacebookStrategy extends PassportStrategy(
+  Strategy as any,
+  'facebook',
+) {
   private readonly logger = new Logger(FacebookStrategy.name);
 
   constructor() {
@@ -18,24 +31,24 @@ export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
     this.logger.log('FacebookStrategy initialized');
   }
 
-  async validate(
+  public validate(
     accessToken: string,
     refreshToken: string,
-    profile: any,
-    done: VerifyCallback,
-  ) {
+    profile: ExplicitFacebookProfile,
+    done: (err: Error | null, user?: unknown) => void,
+  ): void {
     const user = {
       provider: 'FACEBOOK',
       providerUserId: profile.id,
-      email: profile.emails?.[0]?.value,
+      email: profile.emails?.[0]?.value || null,
       displayName:
         `${profile.name?.givenName ?? ''} ${profile.name?.familyName ?? ''}`.trim(),
-      avatarUrl: profile.photos?.[0]?.value,
+      avatarUrl: profile.photos?.[0]?.value || null,
       accessToken,
       refreshToken,
     };
 
-    this.logger.log(`Facebook OAuth login: ${user.email}`);
+    this.logger.log(`Facebook OAuth login: ${user.email ?? 'unknown'}`);
 
     done(null, user);
   }

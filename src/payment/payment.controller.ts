@@ -22,7 +22,6 @@ import {
 import { CurrentUser } from '../authentication/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
 
-
 @ApiTags('Payments')
 @Controller('payments')
 export class PaymentController {

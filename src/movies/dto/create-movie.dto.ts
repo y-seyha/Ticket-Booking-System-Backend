@@ -1,10 +1,4 @@
-import {
-  IsString,
-  IsOptional,
-  IsInt,
-  Min,
-  IsDate,
-} from 'class-validator';
+import { IsString, IsOptional, IsInt, Min, IsDate } from 'class-validator';
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -53,6 +47,4 @@ export class CreateMovieDto {
   @IsOptional()
   @IsString()
   trailerYoutubeId?: string;
-
 }
-

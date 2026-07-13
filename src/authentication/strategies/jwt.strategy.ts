@@ -4,8 +4,21 @@ import { Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
+import { Role } from '@prisma/client';
 
-const cookieExtractor = (req: Request) => {
+interface JwtPayload {
+  sub: string;
+  email: string;
+  role: Role;
+}
+
+interface RequestWithCookies extends Request {
+  cookies: {
+    access_token?: string;
+  };
+}
+
+const cookieExtractor = (req: RequestWithCookies): string | null => {
   return req?.cookies?.access_token || null;
 };
 
@@ -25,7 +38,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: any) {
+  async validate(payload: JwtPayload) {
     const account = await this.prisma.account.findUnique({
       where: { id: payload.sub },
       select: {

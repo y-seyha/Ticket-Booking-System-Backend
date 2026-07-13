@@ -80,7 +80,7 @@ export class MailerService {
   //   return res.data;
   // }
 
-// Inside MailerService (NestJS)
+  // Inside MailerService (NestJS)
   async sendVerificationEmail(to: string, token: string) {
     const frontendBaseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
@@ -91,15 +91,15 @@ export class MailerService {
     const text = `Verify your email: ${verificationUrl.toString()}`;
 
     const res = await axios.post(
-        this.endpoint,
-        {
-          sender: this.sender,
-          to: [{ email: to }],
-          subject: 'Verify Your Email - Coffee POS System',
-          htmlContent: html,
-          textContent: text,
-        },
-        { headers: this.headers, timeout: 10000 },
+      this.endpoint,
+      {
+        sender: this.sender,
+        to: [{ email: to }],
+        subject: 'Verify Your Email - Coffee POS System',
+        htmlContent: html,
+        textContent: text,
+      },
+      { headers: this.headers, timeout: 10000 },
     );
 
     console.log('📧 Brevo verification email response:', res.data);
@@ -155,19 +155,19 @@ export class MailerService {
   //   );
   // }
 
-    async sendResetPasswordEmail(to: string, token: string) {
-        // 1. Change this to use your FRONTEND client application URL
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+  async sendResetPasswordEmail(to: string, token: string) {
+    // 1. Change this to use your FRONTEND client application URL
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
 
-        // 2. Point to your Next.js frontend route (e.g., /auth/reset-password)
-        const resetUrl = new URL('/auth/reset-password', frontendUrl);
-        resetUrl.searchParams.set('token', token);
+    // 2. Point to your Next.js frontend route (e.g., /auth/reset-password)
+    const resetUrl = new URL('/auth/reset-password', frontendUrl);
+    resetUrl.searchParams.set('token', token);
 
-        console.log("Email Reset Link generated:", resetUrl.toString());
+    console.log('Email Reset Link generated:', resetUrl.toString());
 
-        const html = this.wrapEmail(
-            'Reset Password',
-            `
+    const html = this.wrapEmail(
+      'Reset Password',
+      `
       <h2 style="margin:0 0 10px;font-size:18px;font-weight:600;">
         Reset your password
       </h2>
@@ -193,19 +193,19 @@ export class MailerService {
         This link expires in 5 minutes.
       </p>
       `,
-        );
+    );
 
-        await axios.post(
-            this.endpoint,
-            {
-                sender: this.sender,
-                to: [{ email: to }],
-                subject: 'Reset Password',
-                htmlContent: html,
-            },
-            { headers: this.headers },
-        );
-    }
+    await axios.post(
+      this.endpoint,
+      {
+        sender: this.sender,
+        to: [{ email: to }],
+        subject: 'Reset Password',
+        htmlContent: html,
+      },
+      { headers: this.headers },
+    );
+  }
 
   async sendReactivateAccountEmail(to: string, token: string) {
     const baseUrl = process.env.BACKEND_URL!;
