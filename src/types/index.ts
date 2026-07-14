@@ -12,3 +12,17 @@ export interface RefreshResponse {
     sid: string;
   };
 }
+
+export interface OAuthProfile {
+  provider: string;
+  providerUserId: string;
+  email: string | null;
+  displayName?: string;
+}
+
+export interface AuthenticatedRequest {
+  headers: Record<string, string | string[] | undefined>;
+  ip?: string;
+  cookies?: Record<string, string>;
+  user?: { sub: string };
+}
