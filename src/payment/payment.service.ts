@@ -13,6 +13,7 @@ import {
   CheckoutResponseDto,
 } from '../checkout/dto/create-checkout.dto';
 import { SeatGateway } from '../seat/seat.gateway';
+import { TicketService } from '../ticket/ticket.service';
 
 @Injectable()
 export class PaymentService {
@@ -21,6 +22,7 @@ export class PaymentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly seatGateway: SeatGateway,
+    private readonly ticketService: TicketService,
   ) {}
 
   /**
@@ -194,6 +196,8 @@ export class PaymentService {
         payment.booking.showtimeId,
         result.bookingSeats.map((bs) => bs.seatId),
       );
+
+      await this.ticketService.generateTicketsForBooking(payment.bookingId);
 
       return {
         message: 'Cash payment completed successfully',

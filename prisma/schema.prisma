@@ -101,6 +101,13 @@ enum PaymentStatus {
   EXPIRED
 }
 
+enum TicketStatus {
+  ACTIVE
+  USED
+  REFUNDED
+  EXPIRED
+}
+
 model Account {
   id                  String               @id @default(uuid())
   email               String               @unique
@@ -125,6 +132,7 @@ model Account {
   uploadedFiles       File[]
   bookings            Booking[]
   seatLocks           SeatLock[]
+  tickets             Ticket[]
 }
 
 model UserProfile {
@@ -442,6 +450,7 @@ model Booking {
   showtime     Showtime      @relation(fields: [showtimeId], references: [id])
   bookingSeats BookingSeat[]
   payment      Payment?
+  tickets      Ticket[]
 
   @@index([accountId])
   @@index([showtimeId])
@@ -457,6 +466,7 @@ model BookingSeat {
   booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   seat       Seat     @relation(fields: [seatId], references: [id])
   showtime   Showtime @relation(fields: [showtimeId], references: [id])
+  ticket     Ticket?
 
   @@unique([bookingId, seatId])
   @@unique([showtimeId, seatId])
@@ -479,5 +489,27 @@ model Payment {
   updatedAt      DateTime        @updatedAt
   booking        Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
+  @@index([status])
+}
+
+model Ticket {
+  id            String       @id @default(uuid())
+  bookingId     String
+  bookingSeatId String       @unique
+  accountId     String
+  qrCode        String       @unique
+  status        TicketStatus @default(ACTIVE)
+  validatedAt   DateTime?
+  validatedBy   String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  booking     Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingSeat BookingSeat @relation(fields: [bookingSeatId], references: [id], onDelete: Cascade)
+  account     Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([accountId])
+  @@index([qrCode])
   @@index([status])
 }
