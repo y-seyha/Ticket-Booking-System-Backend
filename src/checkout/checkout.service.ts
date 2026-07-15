@@ -10,12 +10,16 @@ import { CreateCheckoutDto, CheckoutResponseDto } from './dto/create-checkout.dt
 import { PrismaService } from '../prisma/prisma.service';
 import { Cron } from '@nestjs/schedule';
 import * as crypto from 'crypto';
+import { SeatGateway } from '../seat/seat.gateway';
 
 @Injectable()
 export class CheckoutService {
   private readonly logger = new Logger(CheckoutService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly seatGateway: SeatGateway,
+  ) {}
 
   async checkout(accountId: string, dto: CreateCheckoutDto): Promise<CheckoutResponseDto> {
     try {
@@ -157,6 +161,11 @@ export class CheckoutService {
           },
         });
 
+        this.seatGateway.emitSeatsBooked(
+          showtimeId,
+          locks.map((lock) => lock.seatId),
+        );
+
         return { booking, payment };
       });
 
@@ -207,6 +216,9 @@ export class CheckoutService {
         status: BookingStatus.PENDING,
         expiresAt: { lt: now },
       },
+      include: {
+        bookingSeats: true,
+      },
     });
 
     if (!expired.length) return;
@@ -228,6 +240,13 @@ export class CheckoutService {
     ]);
 
     this.logger.log(`Expired ${ids.length} bookings`);
+
+    for (const booking of expired) {
+      this.seatGateway.emitSeatsExpired(
+        booking.showtimeId,
+        booking.bookingSeats.map((bs) => bs.seatId),
+      );
+    }
   }
 }
 

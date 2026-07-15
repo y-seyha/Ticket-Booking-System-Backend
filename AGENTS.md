@@ -48,6 +48,19 @@ Order: `lint` before committing; no typecheck script exists (`tsc` via `nest bui
 - Generated client lives in `node_modules`; `prisma generate` required after pulls/schema changes
 - Migrations in `prisma/migrations/`
 
+## WebSocket / real-time
+- **Namespace**: `/seats` — Socket.IO gateway in `src/seat/seat.gateway.ts`
+- **Auth**: JWT via handshake `auth.token` or `query.token` (optional — unauthenticated connections allowed for seat viewing)
+- **Rooms**: `showtime:<showtimeId>` — clients join via `joinShowtime` / `leaveShowtime`
+- **Server events**:
+  | Event | Payload | When |
+  |---|---|---|
+  | `seat:locked` | `{ seatId, showtimeId }` | Seat lock created |
+  | `seat:unlocked` | `{ seatId, showtimeId }` | Seat unlocked or lock expired |
+  | `seat:booked` | `{ seatIds[], showtimeId }` | Booking confirmed (payment success) |
+  | `seat:expired` | `{ seatIds[], showtimeId }` | PENDING booking expired |
+- **Emitter services**: `SeatService`, `CheckoutService`, `PaymentService` all inject `SeatGateway`
+
 ## Auth & security
 - JWT (15m access) + refresh tokens via Passport strategies
 - OAuth: Google, GitHub, Facebook, Discord

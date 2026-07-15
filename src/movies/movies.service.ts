@@ -123,7 +123,10 @@ export class MoviesService {
       ]);
 
       return {
-        data: movies,
+        data: movies.map((m) => ({
+          ...m,
+          poster: m.poster?.url || null,
+        })),
         pagination: {
           total,
           page,

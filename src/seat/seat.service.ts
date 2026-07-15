@@ -9,12 +9,16 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateSeatLockDto } from './dto/create-seat-lock.dto';
 import { BookingStatus, Prisma } from '@prisma/client';
 import { Cron } from '@nestjs/schedule';
+import { SeatGateway } from './seat.gateway';
 
 @Injectable()
 export class SeatService {
   private readonly logger = new Logger(SeatService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly seatGateway: SeatGateway,
+  ) {}
 
   async getSeatsByScreen(screenId: string) {
     try {
@@ -218,6 +222,8 @@ export class SeatService {
           },
         });
 
+        this.seatGateway.emitSeatLocked(dto.showtimeId, dto.seatId);
+
         return {
           message: 'Seat locked successfully',
           lock,
@@ -377,13 +383,21 @@ export class SeatService {
   }
 
   async clearMyCart(accountId: string) {
-    const result = await this.prisma.seatLock.deleteMany({
+    const locks = await this.prisma.seatLock.findMany({
       where: { accountId },
     });
 
+    await this.prisma.seatLock.deleteMany({
+      where: { accountId },
+    });
+
+    for (const lock of locks) {
+      this.seatGateway.emitSeatUnlocked(lock.showtimeId, lock.seatId);
+    }
+
     return {
       message: 'Cart cleared successfully',
-      count: result.count,
+      count: locks.length,
     };
   }
 
@@ -412,6 +426,8 @@ export class SeatService {
       },
     });
 
+    this.seatGateway.emitSeatUnlocked(showtimeId, seatId);
+
     return {
       message: 'Seat unlocked successfully',
     };
@@ -419,7 +435,7 @@ export class SeatService {
 
   @Cron('*/30 * * * * *')
   async cleanupExpiredLocks() {
-    const result = await this.prisma.seatLock.deleteMany({
+    const expired = await this.prisma.seatLock.findMany({
       where: {
         expiresAt: {
           lt: new Date(),
@@ -427,8 +443,18 @@ export class SeatService {
       },
     });
 
-    if (result.count > 0) {
-      this.logger.log(`Removed ${result.count} expired seat locks`);
+    if (!expired.length) return;
+
+    await this.prisma.seatLock.deleteMany({
+      where: {
+        id: { in: expired.map((l) => l.id) },
+      },
+    });
+
+    this.logger.log(`Removed ${expired.length} expired seat locks`);
+
+    for (const lock of expired) {
+      this.seatGateway.emitSeatUnlocked(lock.showtimeId, lock.seatId);
     }
   }
 }

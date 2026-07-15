@@ -12,12 +12,16 @@ import {
   UpdatePaymentMethodDto,
   CheckoutResponseDto,
 } from '../checkout/dto/create-checkout.dto';
+import { SeatGateway } from '../seat/seat.gateway';
 
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly seatGateway: SeatGateway,
+  ) {}
 
   /**
    * Allows the customer to alter their payment option dynamically while
@@ -175,11 +179,21 @@ export class PaymentService {
           },
         });
 
+        const bookingSeats = await tx.bookingSeat.findMany({
+          where: { bookingId: payment.bookingId },
+        });
+
         return {
           updatedPayment,
           updatedBooking,
+          bookingSeats,
         };
       });
+
+      this.seatGateway.emitSeatsBooked(
+        payment.booking.showtimeId,
+        result.bookingSeats.map((bs) => bs.seatId),
+      );
 
       return {
         message: 'Cash payment completed successfully',

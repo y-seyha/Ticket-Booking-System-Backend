@@ -393,6 +393,7 @@ export class ShowtimeService {
       return await this.prisma.showtime.findMany({
         where: { movieId },
         include: {
+          movie: true,
           screen: { include: { theater: true } },
         },
         orderBy: { startTime: 'asc' },
@@ -581,6 +582,8 @@ export class ShowtimeService {
           screenName: st.screen.name,
           screenType: st.screen.type,
           theaterName: st.screen.theater.name,
+          theaterLocation: st.screen.theater.location,
+          theaterCity: st.screen.theater.city,
         })),
       }));
     } catch (error) {
