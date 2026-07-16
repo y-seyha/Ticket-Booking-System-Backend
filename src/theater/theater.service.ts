@@ -15,6 +15,7 @@ import { FileUploadService } from '../file-upload/file-upload.service';
 import { UploadFolder } from '../file-upload/dto/upload-file.dto';
 import { File } from '@prisma/client';
 import { Prisma } from '@prisma/client';
+import { SearchService } from '../search/search.service';
 
 @Injectable()
 export class TheaterService {
@@ -23,6 +24,7 @@ export class TheaterService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly fileUploadService: FileUploadService,
+    private readonly searchService: SearchService,
   ) {}
 
   async create(
@@ -56,7 +58,7 @@ export class TheaterService {
         },
       });
 
-      this.logger.log(`Theater created: ${theater.id}`);
+      await this.searchService.indexTheater(theater);
 
       return theater;
     } catch (error) {
@@ -189,7 +191,7 @@ export class TheaterService {
         },
       });
 
-      this.logger.log(`Theater updated: ${id}`);
+      await this.searchService.indexTheater(updated);
 
       return updated;
     } catch (error) {
@@ -232,6 +234,8 @@ export class TheaterService {
       await this.prisma.theater.delete({
         where: { id },
       });
+
+      await this.searchService.removeTheater(id);
 
       this.logger.log(`Theater deleted: ${id}`);
 

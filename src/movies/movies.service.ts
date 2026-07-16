@@ -15,6 +15,7 @@ import { FileUploadService } from '../file-upload/file-upload.service';
 import { UploadFolder } from '../file-upload/dto/upload-file.dto';
 import { File } from '@prisma/client';
 import { toZonedTime } from 'date-fns-tz';
+import { SearchService } from '../search/search.service';
 
 @Injectable()
 export class MoviesService {
@@ -23,6 +24,7 @@ export class MoviesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly fileUploadService: FileUploadService,
+    private readonly searchService: SearchService,
   ) {}
 
   async create(
@@ -53,9 +55,9 @@ export class MoviesService {
           poster: true,
         },
       });
-      this.logger.log({
-        releaseDate: dto.releaseDate,
-        now: new Date(),
+      await this.searchService.indexMovie({
+        ...movie,
+        poster: (movie as any).poster?.url ?? null,
       });
 
       return movie;
@@ -340,7 +342,7 @@ export class MoviesService {
 
       const updatedReleaseDate = dto.releaseDate ?? movie.releaseDate;
 
-      return this.prisma.movie.update({
+      const updated = await this.prisma.movie.update({
         where: { id },
         data: {
           ...dto,
@@ -351,6 +353,13 @@ export class MoviesService {
           poster: true,
         },
       });
+
+      await this.searchService.indexMovie({
+        ...updated,
+        poster: (updated as any).poster?.url ?? null,
+      });
+
+      return updated;
     } catch (error) {
       this.logger.error(`Failed to update movie ${id}`, error?.stack);
       throw error;
@@ -385,6 +394,8 @@ export class MoviesService {
       await this.prisma.movie.delete({
         where: { id },
       });
+
+      await this.searchService.removeMovie(id);
 
       this.logger.log(`Movie deleted successfully: ${id}`);
 
@@ -428,10 +439,18 @@ export class MoviesService {
         );
       }
 
-      return await this.prisma.movie.update({
+      const statusUpdated = await this.prisma.movie.update({
         where: { id },
         data: { status },
+        include: { poster: true },
       });
+
+      await this.searchService.indexMovie({
+        ...statusUpdated,
+        poster: (statusUpdated as any).poster?.url ?? null,
+      });
+
+      return statusUpdated;
     } catch (error) {
       this.logger.error(`Failed to update movie status ${id}`, error?.stack);
       throw error;

@@ -3,9 +3,10 @@ import { TheaterController } from './theater.controller';
 import { TheaterService } from './theater.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { FileUploadModule } from '../file-upload/file-upload.module';
+import { SearchModule } from '../search/search.module';
 
 @Module({
-  imports: [PrismaModule, FileUploadModule],
+  imports: [PrismaModule, FileUploadModule, SearchModule],
   controllers: [TheaterController],
   providers: [TheaterService],
 })

@@ -17,6 +17,7 @@ import { SeatPricingModule } from './seat-pricing/seat-pricing.module';
 import { CheckoutModule } from './checkout/checkout.module';
 import { PaymentModule } from './payment/payment.module';
 import { TicketModule } from './ticket/ticket.module';
+import { SearchModule } from './search/search.module';
 import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
@@ -40,6 +41,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     CheckoutModule,
     PaymentModule,
     TicketModule,
+    SearchModule,
   ],
   controllers: [AppController],
   providers: [AppService],
