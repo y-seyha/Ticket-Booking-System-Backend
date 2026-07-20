@@ -78,6 +78,7 @@ describe('ScreenTemplateService', () => {
       const originalDto = {
         name: 'IMAX',
         type: ScreenType.STANDARD,
+        screenSurcharge: 12.5,
       };
 
       mockPrisma.screenTemplate.create.mockResolvedValue({

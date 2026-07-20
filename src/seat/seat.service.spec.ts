@@ -24,6 +24,7 @@ describe('SeatService', () => {
       findUnique: jest.fn(),
     },
     seatLock: {
+      findMany: jest.fn(),
       findUnique: jest.fn(),
       create: jest.fn(),
       delete: jest.fn(),
@@ -104,8 +105,8 @@ describe('SeatService', () => {
       expect(s1).toBeDefined();
       expect(s2).toBeDefined();
 
-      expect(s1!.isLocked).toBe(true);
-      expect(s2!.isBooked).toBe(true);
+      expect(s1!.status).toBe('LOCKED');
+      expect(s2!.status).toBe('BOOKED');
     });
 
     it('should filter expired locks', async () => {
@@ -122,7 +123,7 @@ describe('SeatService', () => {
 
       const result = await service.getSeatMap('st1');
 
-      expect(result[0].isLocked).toBe(false);
+      expect(result[0].status).toBe('AVAILABLE');
     });
 
     it('should throw NotFoundException when showtime missing', async () => {
@@ -262,13 +263,16 @@ describe('SeatService', () => {
 
   describe('cleanupExpiredLocks', () => {
     it('should delete expired locks and log count', async () => {
-      mockPrisma.seatLock.deleteMany.mockResolvedValue({ count: 5 });
+      mockPrisma.seatLock.findMany.mockResolvedValue([
+        { id: 'l1', showtimeId: 'st1', seatId: 's1', accountId: 'acc1', expiresAt: new Date(Date.now() - 10000) },
+        { id: 'l2', showtimeId: 'st1', seatId: 's2', accountId: 'acc2', expiresAt: new Date(Date.now() - 5000) },
+      ]);
+      mockPrisma.seatLock.deleteMany.mockResolvedValue({ count: 2 });
 
-      const result = await service.cleanupExpiredLocks();
+      await service.cleanupExpiredLocks();
 
-      expect(result.count).toBe(5);
       expect(mockLogger.log).toHaveBeenCalledWith(
-        expect.stringContaining('Cleaned 5'),
+        expect.stringContaining('Removed 2'),
       );
     });
 

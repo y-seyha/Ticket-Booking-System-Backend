@@ -1,6 +1,27 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { BookingStatus, PaymentProvider, PaymentStatus } from '@prisma/client';
+
+export class FoodItemEntry {
+  @ApiProperty({ example: 'uuid-of-food-item' })
+  @IsUUID()
+  foodItemId: string;
+
+  @ApiProperty({ example: 2, minimum: 1 })
+  @IsInt()
+  @Min(1)
+  quantity: number;
+}
 
 export class CreateCheckoutDto {
   @ApiProperty({
@@ -22,6 +43,17 @@ export class CreateCheckoutDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  @ApiProperty({
+    required: false,
+    type: [FoodItemEntry],
+    description: 'Optional food items to add to the booking',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => FoodItemEntry)
+  foodItems?: FoodItemEntry[];
 }
 
 export class UpdatePaymentMethodDto {

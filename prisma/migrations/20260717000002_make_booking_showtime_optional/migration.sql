@@ -1,0 +1,1 @@
+ALTER TABLE "Booking" ALTER COLUMN "showtimeId" DROP NOT NULL;

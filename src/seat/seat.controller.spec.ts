@@ -137,7 +137,7 @@ describe('SeatController', () => {
       });
 
       expect(
-        await controller.unlockSeat(req as any, 'show-1', 'seat-1'),
+        await controller.unlockSeat(req as any, { showtimeId: 'show-1', seatId: 'seat-1' }),
       ).toEqual({ message: 'Unlocked' });
 
       expect(mockService.unlockSeat).toHaveBeenCalledWith(
@@ -151,7 +151,7 @@ describe('SeatController', () => {
       mockService.unlockSeat.mockRejectedValue(new NotFoundException());
 
       await expect(
-        controller.unlockSeat(req as any, 'show-1', 'seat-1'),
+        controller.unlockSeat(req as any, { showtimeId: 'show-1', seatId: 'seat-1' }),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -159,7 +159,7 @@ describe('SeatController', () => {
       mockService.unlockSeat.mockRejectedValue(new BadRequestException());
 
       await expect(
-        controller.unlockSeat(req as any, 'show-1', 'seat-1'),
+        controller.unlockSeat(req as any, { showtimeId: 'show-1', seatId: 'seat-1' }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -169,7 +169,7 @@ describe('SeatController', () => {
       );
 
       await expect(
-        controller.unlockSeat(req as any, 'show-1', 'seat-1'),
+        controller.unlockSeat(req as any, { showtimeId: 'show-1', seatId: 'seat-1' }),
       ).rejects.toThrow(InternalServerErrorException);
     });
   });

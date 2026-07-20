@@ -33,7 +33,9 @@ export class TicketService {
     }
 
     if (booking.status !== 'CONFIRMED') {
-      throw new BadRequestException('Booking must be CONFIRMED to generate tickets');
+      throw new BadRequestException(
+        'Booking must be CONFIRMED to generate tickets',
+      );
     }
 
     const existing = await this.prisma.ticket.findFirst({
@@ -83,6 +85,9 @@ export class TicketService {
                 },
               },
             },
+            foodItems: {
+              include: { foodItem: true },
+            },
           },
         },
         bookingSeat: {
@@ -95,6 +100,42 @@ export class TicketService {
         createdAt: 'desc',
       },
     });
+  }
+
+  async getTicketsByBooking(bookingId: string, accountId: string) {
+    const tickets = await this.prisma.ticket.findMany({
+      where: { bookingId, accountId },
+      include: {
+        booking: {
+          include: {
+            showtime: {
+              include: {
+                movie: true,
+                screen: {
+                  include: {
+                    theater: true,
+                  },
+                },
+              },
+            },
+            foodItems: {
+              include: { foodItem: true },
+            },
+          },
+        },
+        bookingSeat: {
+          include: {
+            seat: true,
+          },
+        },
+      },
+    });
+
+    if (!tickets.length) {
+      throw new NotFoundException('No tickets found for this booking');
+    }
+
+    return tickets;
   }
 
   async getTicketById(ticketId: string, accountId: string) {
@@ -112,6 +153,9 @@ export class TicketService {
                   },
                 },
               },
+            },
+            foodItems: {
+              include: { foodItem: true },
             },
           },
         },
@@ -155,6 +199,9 @@ export class TicketService {
                 },
               },
             },
+            foodItems: {
+              include: { foodItem: true },
+            },
           },
         },
         bookingSeat: {
@@ -187,6 +234,9 @@ export class TicketService {
                   },
                 },
               },
+            },
+            foodItems: {
+              include: { foodItem: true },
             },
           },
         },
@@ -241,6 +291,9 @@ export class TicketService {
                 },
               },
             },
+            foodItems: {
+              include: { foodItem: true },
+            },
           },
         },
         bookingSeat: {
@@ -251,7 +304,9 @@ export class TicketService {
       },
     });
 
-    this.logger.log(`Ticket ${ticket.qrCode} validated by cashier ${cashierId}`);
+    this.logger.log(
+      `Ticket ${ticket.qrCode} validated by cashier ${cashierId}`,
+    );
 
     return updated;
   }
@@ -339,6 +394,9 @@ export class TicketService {
             ticket: true,
           },
         },
+        foodItems: {
+          include: { foodItem: true },
+        },
         payment: true,
       },
       orderBy: {
@@ -373,6 +431,9 @@ export class TicketService {
                   },
                 },
               },
+            },
+            foodItems: {
+              include: { foodItem: true },
             },
           },
         },

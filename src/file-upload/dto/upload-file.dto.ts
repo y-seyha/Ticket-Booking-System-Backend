@@ -5,6 +5,7 @@ export enum UploadFolder {
   AVATARS = 'avatars',
   MOVIES = 'movies',
   THEATERS = 'theaters',
+  FOOD = 'food',
   GENERAL = 'general',
 }
 

@@ -152,7 +152,12 @@ describe('AuthenticationService', () => {
   describe('verifyEmail', () => {
     it('should verify email successfully', async () => {
       prismaMock.verificationToken.findMany.mockResolvedValue([
-        { id: '1', tokenHash: 'hash', accountId: 'acc1', account: { id: 'acc1', email: 'test@test.com' } },
+        {
+          id: '1',
+          tokenHash: 'hash',
+          accountId: 'acc1',
+          account: { id: 'acc1', email: 'test@test.com' },
+        },
       ]);
 
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);

@@ -12,6 +12,23 @@ enum AccountStatus {
   DELETED
 }
 
+enum NotificationType {
+  BOOKING_CONFIRMATION
+  BOOKING_CANCELLATION
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+  ACCOUNT_REACTIVATE
+  UPCOMING_SHOWTIME
+  PAYMENT_RECEIVED
+  SYSTEM
+}
+
+enum NotificationChannel {
+  PUSH
+  IN_APP
+  EMAIL
+}
+
 enum TokenType {
   EMAIL
   PHONE
@@ -133,6 +150,8 @@ model Account {
   bookings            Booking[]
   seatLocks           SeatLock[]
   tickets             Ticket[]
+  deviceTokens        DeviceToken[]
+  notifications       Notification[]
 }
 
 model UserProfile {
@@ -269,8 +288,9 @@ model File {
   updatedAt     DateTime @updatedAt
   uploader      Account? @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
 
-  avatarOfUser UserProfile?
-  theaterOf    Theater?
+  avatarOfUser        UserProfile?
+  theaterOf           Theater?
+  foodItemOf          FoodItem?
 
   @@index([uploaderId])
 }
@@ -308,6 +328,35 @@ model Theater {
   updatedAt DateTime @updatedAt
 
   screens Screen[]
+}
+
+model FoodCategory {
+  id        String   @id @default(uuid())
+  name      String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items FoodItem[]
+}
+
+model FoodItem {
+  id          String       @id @default(uuid())
+  name        String
+  description String?
+  price       Decimal      @db.Decimal(10, 2)
+  imageId     String?      @unique
+  image       File?        @relation(fields: [imageId], references: [id])
+  categoryId  String
+  category    FoodCategory      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  isActive    Boolean           @default(true)
+  sortOrder   Int               @default(0)
+  bookings    BookingFoodItem[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([categoryId])
 }
 
 model Screen {
@@ -439,7 +488,7 @@ model Showtime {
 model Booking {
   id           String        @id @default(uuid())
   accountId    String
-  showtimeId   String
+  showtimeId   String?
   bookingCode  String        @unique
   totalPrice   Decimal       @db.Decimal(10, 2)
   status       BookingStatus
@@ -447,8 +496,9 @@ model Booking {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   account      Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  showtime     Showtime      @relation(fields: [showtimeId], references: [id])
+  showtime     Showtime?     @relation(fields: [showtimeId], references: [id])
   bookingSeats BookingSeat[]
+  foodItems    BookingFoodItem[]
   payment      Payment?
   tickets      Ticket[]
 
@@ -473,6 +523,20 @@ model BookingSeat {
   @@index([bookingId])
   @@index([seatId])
   @@index([showtimeId])
+}
+
+model BookingFoodItem {
+  id         String   @id @default(uuid())
+  bookingId  String
+  foodItemId String
+  quantity   Int      @default(1)
+  unitPrice  Decimal  @db.Decimal(10, 2)
+  createdAt  DateTime @default(now())
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  foodItem   FoodItem @relation(fields: [foodItemId], references: [id])
+
+  @@index([bookingId])
+  @@index([foodItemId])
 }
 
 model Payment {
@@ -512,4 +576,38 @@ model Ticket {
   @@index([accountId])
   @@index([qrCode])
   @@index([status])
+}
+
+model DeviceToken {
+  id        String   @id @default(uuid())
+  accountId String
+  token     String
+  platform  String   @default("web")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, token])
+  @@index([accountId])
+  @@index([token])
+}
+
+model Notification {
+  id        String             @id @default(uuid())
+  accountId String
+  type      NotificationType
+  channel   NotificationChannel
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime           @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([accountId, readAt])
+  @@index([createdAt])
 }

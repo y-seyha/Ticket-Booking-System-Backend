@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { Client } from '@opensearch-project/opensearch';
@@ -49,7 +45,9 @@ export class SearchService implements OnModuleInit {
   async onModuleInit() {
     const node = this.config.get<string>('OPENSEARCH_URL');
     if (!node) {
-      this.logger.warn('OPENSEARCH_URL not set — search will fall back to database queries');
+      this.logger.warn(
+        'OPENSEARCH_URL not set — search will fall back to database queries',
+      );
       return;
     }
 
@@ -113,7 +111,10 @@ export class SearchService implements OnModuleInit {
       this.enabled = true;
       this.logger.log('OpenSearch indices ready');
     } catch (err) {
-      this.logger.error('OpenSearch connection failed, falling back to DB search', err);
+      this.logger.error(
+        'OpenSearch connection failed, falling back to DB search',
+        err,
+      );
       this.client = null;
     }
   }
@@ -211,7 +212,10 @@ export class SearchService implements OnModuleInit {
     return this.autocompleteDatabase(query);
   }
 
-  private async searchOpenSearch(query: string | undefined, limit: number): Promise<SearchResult> {
+  private async searchOpenSearch(
+    query: string | undefined,
+    limit: number,
+  ): Promise<SearchResult> {
     const must: Record<string, unknown>[] = [{ term: { status: 'ARCHIVED' } }];
 
     const searchBody: Record<string, unknown> = {
@@ -247,7 +251,9 @@ export class SearchService implements OnModuleInit {
     return { movies, theaters: [], total: movies.length };
   }
 
-  private async autocompleteOpenSearch(query: string): Promise<AutocompleteResult> {
+  private async autocompleteOpenSearch(
+    query: string,
+  ): Promise<AutocompleteResult> {
     const movieRes = await this.client!.search({
       index: MOVIES_INDEX,
       body: {
@@ -282,7 +288,10 @@ export class SearchService implements OnModuleInit {
 
   // --- Fallback database search ---
 
-  private async searchDatabase(query: string | undefined, limit: number): Promise<SearchResult> {
+  private async searchDatabase(
+    query: string | undefined,
+    limit: number,
+  ): Promise<SearchResult> {
     const where: Record<string, unknown> = {
       status: { not: 'ARCHIVED' },
     };
@@ -316,7 +325,9 @@ export class SearchService implements OnModuleInit {
     };
   }
 
-  private async autocompleteDatabase(query: string): Promise<AutocompleteResult> {
+  private async autocompleteDatabase(
+    query: string,
+  ): Promise<AutocompleteResult> {
     const movies = await this.prisma.movie.findMany({
       where: {
         title: { contains: query, mode: 'insensitive' },

@@ -69,8 +69,8 @@ export class AuthenticationService {
         });
 
         await this.mailerService.sendVerificationEmail(
-            existingAccount.email,
-            rawToken,
+          existingAccount.email,
+          rawToken,
         );
 
         return {

@@ -346,6 +346,89 @@ export class MailerService {
 `;
   }
 
+  async sendBookingConfirmationEmail(
+    to: string,
+    details: {
+      firstName: string;
+      bookingCode: string;
+      movieTitle: string;
+      theaterName: string;
+      screenName: string;
+      startTime: string;
+      seats: string;
+      totalPrice: number;
+    },
+  ) {
+    const startDate = new Date(details.startTime);
+    const formattedDate = startDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    const formattedTime = startDate.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    const html = this.wrapEmail(
+      'Booking Confirmed',
+      `
+        <h2 style="margin:0 0 10px;font-size:18px;font-weight:600;">
+          Booking Confirmed!
+        </h2>
+        <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">
+          Hi ${details.firstName || 'there'},
+        </p>
+        <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">
+          Your booking <strong>${details.bookingCode}</strong> has been confirmed.
+        </p>
+        <table style="width:100%;border-collapse:collapse;margin:18px 0;font-size:14px;">
+          <tr>
+            <td style="padding:8px;border:1px solid #e5e7eb;font-weight:600;background:#f9fafb;">Movie</td>
+            <td style="padding:8px;border:1px solid #e5e7eb;">${details.movieTitle}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px;border:1px solid #e5e7eb;font-weight:600;background:#f9fafb;">Theater</td>
+            <td style="padding:8px;border:1px solid #e5e7eb;">${details.theaterName} - ${details.screenName}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px;border:1px solid #e5e7eb;font-weight:600;background:#f9fafb;">Date & Time</td>
+            <td style="padding:8px;border:1px solid #e5e7eb;">${formattedDate} at ${formattedTime}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px;border:1px solid #e5e7eb;font-weight:600;background:#f9fafb;">Seats</td>
+            <td style="padding:8px;border:1px solid #e5e7eb;">${details.seats}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px;border:1px solid #e5e7eb;font-weight:600;background:#f9fafb;">Total Paid</td>
+            <td style="padding:8px;border:1px solid #e5e7eb;">$${details.totalPrice.toFixed(2)}</td>
+          </tr>
+        </table>
+        <p style="font-size:13px;color:#4b5563;text-align:center;">
+          Please show your QR code at the entrance for entry.
+        </p>
+        <p style="font-size:12px;color:#6b7280;text-align:center;">
+          Thank you for choosing YS Cineplex!
+        </p>
+        `,
+    );
+
+    const res = await axios.post(
+      this.endpoint,
+      {
+        sender: this.sender,
+        to: [{ email: to }],
+        subject: 'Booking Confirmed - YS Cineplex',
+        htmlContent: html,
+      },
+      { headers: this.headers, timeout: 10000 },
+    );
+
+    console.log('📧 Booking confirmation email sent:', res.data);
+    return res.data;
+  }
+
   private buildVerificationTemplate(url: string) {
     return this.wrapEmail(
       'Verify Email',

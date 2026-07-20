@@ -80,6 +80,7 @@ export class AuthenticationController {
     this.setCookies(res, result);
     return {
       user: result.user,
+      accessToken: result.accessToken,
     };
   }
 
@@ -199,8 +200,12 @@ export class AuthenticationController {
   @ApiOperation({ summary: 'Get current logged-in user' })
   @ApiResponse({ status: 200, description: 'User profile returned' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getMe(@CurrentUser() user: any) {
-    return { user };
+  getMe(
+    @CurrentUser() user: any,
+    @Req() req: any,
+  ) {
+    const accessToken = req.cookies?.access_token || null;
+    return { user, accessToken };
   }
 
   @Post('logout')
@@ -234,6 +239,7 @@ export class AuthenticationController {
 
     return {
       user: result.user,
+      accessToken: result.accessToken,
     };
   }
 

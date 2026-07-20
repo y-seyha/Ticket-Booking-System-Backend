@@ -11,6 +11,7 @@ export interface RefreshResponse {
     email: string;
     sid: string;
   };
+  accessToken: string;
 }
 
 export interface OAuthProfile {

@@ -4,6 +4,7 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { BookingStatus, PaymentProvider, PaymentStatus } from '@prisma/client';
 import { CreateCheckoutDto, CheckoutResponseDto } from './dto/create-checkout.dto';
@@ -20,6 +21,136 @@ export class CheckoutService {
     private readonly prisma: PrismaService,
     private readonly seatGateway: SeatGateway,
   ) {}
+
+  async prepareCheckout(accountId: string) {
+    const now = new Date();
+
+    const categories = await this.prisma.foodCategory.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+      include: {
+        items: {
+          where: { isActive: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+    });
+
+    const foodCategories = categories.map((cat) => ({
+      id: cat.id,
+      name: cat.name,
+      items: cat.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: Number(item.price),
+      })),
+    }));
+
+    const existingPayment = await this.prisma.payment.findFirst({
+      where: {
+        status: PaymentStatus.PENDING,
+        expiresAt: { gt: now },
+        booking: { accountId, status: BookingStatus.PENDING },
+      },
+      include: {
+        booking: {
+          include: {
+            bookingSeats: { include: { seat: true } },
+            foodItems: { include: { foodItem: true } },
+          },
+        },
+      },
+    });
+
+    if (existingPayment) {
+      return {
+        valid: true,
+        existingCheckout: true,
+        bookingId: existingPayment.booking.id,
+        bookingCode: existingPayment.booking.bookingCode,
+        totalAmount: Number(existingPayment.booking.totalPrice),
+        paymentId: existingPayment.id,
+        paymentProvider: existingPayment.provider,
+        paymentExpiresAt: existingPayment.expiresAt,
+        foodCategories,
+      };
+    }
+
+    const locks = await this.prisma.seatLock.findMany({
+      where: { accountId, expiresAt: { gt: now } },
+      include: {
+        seat: true,
+        showtime: {
+          include: {
+            movie: true,
+            screen: { include: { theater: true, template: true } },
+          },
+        },
+      },
+    });
+
+    if (!locks.length) {
+      return {
+        valid: false,
+        error: 'CART_EMPTY',
+        message:
+          'Your cart is empty or seat locks have expired. Please select seats again.',
+      };
+    }
+
+    const showtimeId = locks[0].showtimeId;
+    if (locks.some((l) => l.showtimeId !== showtimeId)) {
+      return {
+        valid: false,
+        error: 'MIXED_SHOWTIMES',
+        message: 'All seats must belong to the same showtime.',
+      };
+    }
+
+    const pricingRules = await this.prisma.seatPricingRule.findMany({
+      where: { isActive: true },
+    });
+    const pricingMap = Object.fromEntries(
+      pricingRules.map((r) => [r.seatType, Number(r.seatSurcharge)]),
+    );
+
+    const seats = locks.map((lock) => {
+      const basePrice = Number(lock.showtime.basePrice);
+      const screenSurcharge = Number(
+        lock.showtime.screen.template.screenSurcharge,
+      );
+      const seatSurcharge = pricingMap[lock.seat.seatType] ?? 0;
+      return {
+        seatId: lock.seat.id,
+        seatRow: lock.seat.seatRow,
+        seatNumber: lock.seat.seatNumber,
+        seatType: lock.seat.seatType,
+        price: basePrice + screenSurcharge + seatSurcharge,
+      };
+    });
+
+    return {
+      valid: true,
+      showtime: {
+        id: showtimeId,
+        startTime: locks[0].showtime.startTime,
+        endTime: locks[0].showtime.endTime,
+        movie: {
+          id: locks[0].showtime.movie.id,
+          title: locks[0].showtime.movie.title,
+          durationMinutes: locks[0].showtime.movie.durationMinutes,
+          language: locks[0].showtime.movie.language,
+        },
+        screen: {
+          name: locks[0].showtime.screen.name,
+          theater: locks[0].showtime.screen.theater,
+        },
+      },
+      seats,
+      totalAmount: seats.reduce((sum, s) => sum + s.price, 0),
+      foodCategories,
+    };
+  }
 
   async checkout(accountId: string, dto: CreateCheckoutDto): Promise<CheckoutResponseDto> {
     try {
@@ -40,16 +171,31 @@ export class CheckoutService {
       });
 
       if (existingPayment) {
-        if (dto.paymentProvider && existingPayment.provider !== dto.paymentProvider) {
-          const updatedPayment = await this.prisma.payment.update({
-            where: { id: existingPayment.id },
-            data: { provider: dto.paymentProvider },
-            include: { booking: true },
-          });
-          return this.mapCheckoutResponse(updatedPayment.booking, updatedPayment);
+        const freshExpiry = new Date(Date.now() + 5 * 60 * 1000);
+
+        await this.prisma.payment.update({
+          where: { id: existingPayment.id },
+          data: {
+            expiresAt: freshExpiry,
+            ...(dto.paymentProvider ? { provider: dto.paymentProvider } : {}),
+          },
+        });
+
+        await this.prisma.booking.update({
+          where: { id: existingPayment.booking.id },
+          data: { expiresAt: freshExpiry },
+        });
+
+        const refreshed = await this.prisma.payment.findUnique({
+          where: { id: existingPayment.id },
+          include: { booking: true },
+        });
+
+        if (!refreshed) {
+          throw new NotFoundException('Payment not found after refresh');
         }
 
-        return this.mapCheckoutResponse(existingPayment.booking, existingPayment);
+        return this.mapCheckoutResponse(refreshed.booking, refreshed);
       }
 
       const locks = await this.prisma.seatLock.findMany({
@@ -72,14 +218,20 @@ export class CheckoutService {
       });
 
       if (!locks.length) {
-        throw new BadRequestException('Cart is empty');
+        throw new BadRequestException({
+          error: 'CART_EMPTY',
+          message: 'Your cart is empty or seat locks have expired.',
+        });
       }
 
       const showtimeId = locks[0].showtimeId;
       const mixedShowtimes = locks.some((lock) => lock.showtimeId !== showtimeId);
 
       if (mixedShowtimes) {
-        throw new BadRequestException('All seats must belong to the same showtime');
+        throw new BadRequestException({
+          error: 'MIXED_SHOWTIMES',
+          message: 'All seats must belong to the same showtime.',
+        });
       }
 
       // Calculate totals using pricing maps
@@ -113,7 +265,10 @@ export class CheckoutService {
         });
 
         if (occupiedSeats.length > 0) {
-          throw new BadRequestException('One or more seats are no longer available');
+          throw new BadRequestException({
+            error: 'SEATS_OCCUPIED',
+            message: 'One or more seats are no longer available.',
+          });
         }
 
         const paymentExpiresAt = new Date(Date.now() + PAYMENT_TIMEOUT_MS);
@@ -143,6 +298,48 @@ export class CheckoutService {
             };
           }),
         });
+
+        let foodTotal = 0;
+
+        if (dto.foodItems?.length) {
+          const foodItemIds = dto.foodItems.map((f) => f.foodItemId);
+          const foodItems = await tx.foodItem.findMany({
+            where: { id: { in: foodItemIds }, isActive: true },
+          });
+
+          if (foodItems.length !== foodItemIds.length) {
+            throw new BadRequestException({
+              error: 'INVALID_FOOD_ITEMS',
+              message: 'One or more food items are invalid or inactive.',
+            });
+          }
+
+          const foodPriceMap = Object.fromEntries(
+            foodItems.map((fi) => [fi.id, Number(fi.price)]),
+          );
+
+          await tx.bookingFoodItem.createMany({
+            data: dto.foodItems.map((fi) => ({
+              bookingId: booking.id,
+              foodItemId: fi.foodItemId,
+              quantity: fi.quantity,
+              unitPrice: foodPriceMap[fi.foodItemId],
+            })),
+          });
+
+          for (const fi of dto.foodItems) {
+            foodTotal += foodPriceMap[fi.foodItemId] * fi.quantity;
+          }
+
+          if (foodTotal > 0) {
+            await tx.booking.update({
+              where: { id: booking.id },
+              data: { totalPrice: totalAmount + foodTotal },
+            });
+          }
+
+          totalAmount += foodTotal;
+        }
 
         const payment = await tx.payment.create({
           data: {
@@ -242,6 +439,7 @@ export class CheckoutService {
     this.logger.log(`Expired ${ids.length} bookings`);
 
     for (const booking of expired) {
+      if (!booking.showtimeId) continue;
       this.seatGateway.emitSeatsExpired(
         booking.showtimeId,
         booking.bookingSeats.map((bs) => bs.seatId),

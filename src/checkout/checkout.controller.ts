@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -29,5 +29,14 @@ export class CheckoutController {
   })
   checkout(@CurrentUser() user: any, @Body() dto: CreateCheckoutDto) {
     return this.checkoutService.checkout(user.id, dto);
+  }
+
+  @Get('prepare')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Validate cart and return checkout preview' })
+  @ApiResponse({ status: 200, description: 'Cart validation result' })
+  prepareCheckout(@CurrentUser() user: any) {
+    return this.checkoutService.prepareCheckout(user.id);
   }
 }

@@ -48,6 +48,12 @@ Order: `lint` before committing; no typecheck script exists (`tsc` via `nest bui
 - Generated client lives in `node_modules`; `prisma generate` required after pulls/schema changes
 - Migrations in `prisma/migrations/`
 
+## Critical — NEVER drop the database
+- **NEVER run `prisma migrate reset` or `prisma db push --accept-data-loss` without explicit user approval.**
+- If a migration requires a reset, ask the user first and explain the alternatives.
+- If the database has drift from migration history, use `prisma migrate diff` to inspect first, then ask the user how to proceed.
+- Prefer `prisma migrate dev --create-only` to generate migration files without applying them when there's drift.
+
 ## WebSocket / real-time
 - **Namespace**: `/seats` — Socket.IO gateway in `src/seat/seat.gateway.ts`
 - **Auth**: JWT via handshake `auth.token` or `query.token` (optional — unauthenticated connections allowed for seat viewing)

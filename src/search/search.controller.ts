@@ -12,7 +12,9 @@ export class SearchController {
   @ApiOperation({ summary: 'Search movies and theaters' })
   @ApiQuery({ name: 'q', required: true, description: 'Search query' })
   @ApiQuery({ name: 'limit', required: false, description: 'Result limit' })
-  async search(@Query(new ValidationPipe({ transform: true })) query: SearchQueryDto) {
+  async search(
+    @Query(new ValidationPipe({ transform: true })) query: SearchQueryDto,
+  ) {
     return this.searchService.search(query.q, query.limit ?? 10);
   }
 

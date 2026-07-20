@@ -14,6 +14,7 @@ import {
 } from '../checkout/dto/create-checkout.dto';
 import { SeatGateway } from '../seat/seat.gateway';
 import { TicketService } from '../ticket/ticket.service';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class PaymentService {
@@ -23,6 +24,7 @@ export class PaymentService {
     private readonly prisma: PrismaService,
     private readonly seatGateway: SeatGateway,
     private readonly ticketService: TicketService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   /**
@@ -192,12 +194,19 @@ export class PaymentService {
         };
       });
 
-      this.seatGateway.emitSeatsBooked(
-        payment.booking.showtimeId,
-        result.bookingSeats.map((bs) => bs.seatId),
-      );
+      if (payment.booking.showtimeId) {
+        this.seatGateway.emitSeatsBooked(
+          payment.booking.showtimeId,
+          result.bookingSeats.map((bs) => bs.seatId),
+        );
+      }
 
       await this.ticketService.generateTicketsForBooking(payment.bookingId);
+
+      await this.notificationService.sendBookingConfirmation(
+        accountId,
+        payment.bookingId,
+      );
 
       return {
         message: 'Cash payment completed successfully',

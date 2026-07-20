@@ -83,7 +83,7 @@ export class TheaterService {
         }),
       };
 
-      const [data, total] = await this.prisma.$transaction([
+      const [data, total] = await Promise.all([
         this.prisma.theater.findMany({
           where,
           skip,

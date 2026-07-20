@@ -31,10 +31,7 @@ export class TicketController {
   @ApiBearerAuth()
   @Get()
   @ApiOperation({ summary: 'Get current user tickets' })
-  getMyTickets(
-    @CurrentUser() user: any,
-    @Query() query: TicketQueryDto,
-  ) {
+  getMyTickets(@CurrentUser() user: any, @Query() query: TicketQueryDto) {
     return this.ticketService.getUserTickets(user.id, query.status);
   }
 
@@ -73,12 +70,23 @@ export class TicketController {
   @Post('validate')
   @ApiOperation({ summary: 'Validate ticket at entry (cashier)' })
   @ApiResponse({ status: 200, description: 'Ticket validated successfully' })
-  @ApiResponse({ status: 400, description: 'Ticket already used/refunded/expired' })
-  validateTicket(
-    @CurrentUser() user: any,
-    @Body() dto: ValidateTicketDto,
-  ) {
+  @ApiResponse({
+    status: 400,
+    description: 'Ticket already used/refunded/expired',
+  })
+  validateTicket(@CurrentUser() user: any, @Body() dto: ValidateTicketDto) {
     return this.ticketService.validateTicket(dto.qrCode, user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('booking/:bookingId')
+  @ApiOperation({ summary: 'Get tickets by booking ID' })
+  getTicketsByBooking(
+    @CurrentUser() user: any,
+    @Param('bookingId') bookingId: string,
+  ) {
+    return this.ticketService.getTicketsByBooking(bookingId, user.id);
   }
 
   @UseGuards(JwtAuthGuard)
