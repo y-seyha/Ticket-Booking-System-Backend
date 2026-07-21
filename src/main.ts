@@ -20,6 +20,7 @@ async function bootstrap() {
       'http://localhost:3001',
       'http://localhost:3002',
       'https://ticket-booking-system-frontend-six.vercel.app',
+      'https://yscinema.site',
     ],
     credentials: true,
   });
