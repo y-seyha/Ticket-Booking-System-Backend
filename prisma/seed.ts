@@ -2,10 +2,41 @@ import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import * as readline from 'readline';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
+
+const SALT_ROUNDS = 12;
+
+function generateStrongPassword(length = 24): string {
+  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lower = 'abcdefghijklmnopqrstuvwxyz';
+  const digits = '0123456789';
+  const special = '!@#$%^&*()-_=+[]{}|;:,.<>?';
+  const all = upper + lower + digits + special;
+
+  // Ensure at least one of each category
+  const required = [
+    upper[crypto.randomInt(upper.length)],
+    lower[crypto.randomInt(lower.length)],
+    digits[crypto.randomInt(digits.length)],
+    special[crypto.randomInt(special.length)],
+  ];
+
+  const remaining = Array.from({ length: length - 4 }, () =>
+    all[crypto.randomInt(all.length)],
+  );
+
+  const combined = [...required, ...remaining];
+  for (let i = combined.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1);
+    [combined[i], combined[j]] = [combined[j], combined[i]];
+  }
+
+  return combined.join('');
+}
 
 async function askToProceed(): Promise<boolean> {
   const rl = readline.createInterface({
@@ -64,8 +95,13 @@ async function main() {
   console.log('Seeding data...');
 
   // ── Accounts ──────────────────────────────────────────────
-  const adminPasswordHash = await bcrypt.hash('Admin123!', 10);
-  const userPasswordHash = await bcrypt.hash('User123!', 10);
+  const adminPassword = generateStrongPassword(32);
+  const userPassword = generateStrongPassword(32);
+  const cashierPassword = generateStrongPassword(32);
+
+  const adminPasswordHash = await bcrypt.hash(adminPassword, SALT_ROUNDS);
+  const userPasswordHash = await bcrypt.hash(userPassword, SALT_ROUNDS);
+  const cashierPasswordHash = await bcrypt.hash(cashierPassword, SALT_ROUNDS);
 
   const adminAccount = await prisma.account.create({
     data: {
@@ -97,6 +133,24 @@ async function main() {
           firstName: 'John',
           lastName: 'Doe',
           phone: '+85598765432',
+          status: 'ACTIVE',
+        },
+      },
+    },
+  });
+
+  const cashierAccount = await prisma.account.create({
+    data: {
+      email: 'cashier@cinema.com',
+      passwordHash: cashierPasswordHash,
+      role: 'CASHIER',
+      status: 'ACTIVE',
+      emailVerified: true,
+      profile: {
+        create: {
+          firstName: 'Cashier',
+          lastName: 'One',
+          phone: '+85511112222',
           status: 'ACTIVE',
         },
       },
@@ -137,6 +191,26 @@ async function main() {
       description: 'VIP cinema screen with premium seats',
       isActive: true,
       screenSurcharge: 3.0,
+    },
+  });
+
+  const imaxTemplate = await prisma.screenTemplate.create({
+    data: {
+      name: 'IMAX Template',
+      type: 'IMAX',
+      description: 'Large format IMAX screen',
+      isActive: true,
+      screenSurcharge: 5.0,
+    },
+  });
+
+  const threeDTemplate = await prisma.screenTemplate.create({
+    data: {
+      name: '3D Template',
+      type: 'THREE_D',
+      description: '3D cinema screen',
+      isActive: true,
+      screenSurcharge: 2.0,
     },
   });
 
@@ -209,6 +283,77 @@ async function main() {
 
   await prisma.screenTemplateSeat.createMany({ data: vipSeatData });
 
+  // IMAX layout — 10 rows (A-J) × 14 seats
+  const imaxLayout = await prisma.seatLayout.create({
+    data: {
+      name: 'IMAX Layout',
+      templateId: imaxTemplate.id,
+    },
+  });
+
+  const imaxRows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+  const imaxSeatData: Array<{
+    layoutId: string;
+    seatRow: string;
+    seatNumber: number;
+    posX: number;
+    posY: number;
+    seatType: 'STANDARD' | 'VIP' | 'COUPLE' | 'WHEELCHAIR';
+  }> = [];
+
+  for (const [rowIdx, row] of imaxRows.entries()) {
+    for (let seatNum = 1; seatNum <= 14; seatNum++) {
+      let seatType: 'STANDARD' | 'VIP' | 'COUPLE' | 'WHEELCHAIR' = 'STANDARD';
+      if (row === 'A' && seatNum <= 2) seatType = 'WHEELCHAIR';
+      else if (row === 'J') seatType = 'VIP';
+      imaxSeatData.push({
+        layoutId: imaxLayout.id,
+        seatRow: row,
+        seatNumber: seatNum,
+        posX: (seatNum - 1) * 50,
+        posY: rowIdx * 50,
+        seatType,
+      });
+    }
+  }
+
+  await prisma.screenTemplateSeat.createMany({ data: imaxSeatData });
+
+  // 3D layout — 8 rows (A-H) × 10 seats
+  const threeDLayout = await prisma.seatLayout.create({
+    data: {
+      name: '3D Layout',
+      templateId: threeDTemplate.id,
+    },
+  });
+
+  const threeDSeatData: Array<{
+    layoutId: string;
+    seatRow: string;
+    seatNumber: number;
+    posX: number;
+    posY: number;
+    seatType: 'STANDARD' | 'VIP' | 'COUPLE' | 'WHEELCHAIR';
+  }> = [];
+
+  for (const [rowIdx, row] of rows.entries()) {
+    for (let seatNum = 1; seatNum <= 10; seatNum++) {
+      let seatType: 'STANDARD' | 'VIP' | 'COUPLE' | 'WHEELCHAIR' = 'STANDARD';
+      if (row === 'A' && seatNum <= 2) seatType = 'WHEELCHAIR';
+      else if (row === 'H') seatType = 'VIP';
+      threeDSeatData.push({
+        layoutId: threeDLayout.id,
+        seatRow: row,
+        seatNumber: seatNum,
+        posX: (seatNum - 1) * 50,
+        posY: rowIdx * 50,
+        seatType,
+      });
+    }
+  }
+
+  await prisma.screenTemplateSeat.createMany({ data: threeDSeatData });
+
   // ── Theaters & Screens ────────────────────────────────────
   const theater1 = await prisma.theater.create({
     data: {
@@ -232,7 +377,17 @@ async function main() {
     },
   });
 
-  // Create screens from template seats
+  const theater3 = await prisma.theater.create({
+    data: {
+      name: 'Major Cineplex Sihanoukville',
+      location: 'Golden Lions Roundabout, Sihanoukville',
+      city: 'Sihanoukville',
+      phone: '+85523456791',
+      email: 'sihanoukville@majorcineplex.com',
+      status: 'ACTIVE',
+    },
+  });
+
   async function createScreensFromTemplate(
     theaterId: string,
     templateId: string,
@@ -271,6 +426,7 @@ async function main() {
     return screen;
   }
 
+  // Theater 1: Exchange Square — 3 screens
   const screen1 = await createScreensFromTemplate(
     theater1.id,
     standardTemplate.id,
@@ -284,16 +440,44 @@ async function main() {
     'VIP',
   );
   const screen3 = await createScreensFromTemplate(
+    theater1.id,
+    imaxTemplate.id,
+    'IMAX Screen',
+    'IMAX',
+  );
+
+  // Theater 2: Aeon Mall — 3 screens
+  const screen4 = await createScreensFromTemplate(
     theater2.id,
     standardTemplate.id,
     'Screen A',
     'STANDARD',
   );
-  const screen4 = await createScreensFromTemplate(
+  const screen5 = await createScreensFromTemplate(
     theater2.id,
     standardTemplate.id,
     'Screen B',
     'STANDARD',
+  );
+  const screen6 = await createScreensFromTemplate(
+    theater2.id,
+    threeDTemplate.id,
+    '3D Screen',
+    'THREE_D',
+  );
+
+  // Theater 3: Sihanoukville — 2 screens
+  const screen7 = await createScreensFromTemplate(
+    theater3.id,
+    standardTemplate.id,
+    'Screen 1',
+    'STANDARD',
+  );
+  const screen8 = await createScreensFromTemplate(
+    theater3.id,
+    vipTemplate.id,
+    'VIP Screen',
+    'VIP',
   );
 
   // ── Movies ────────────────────────────────────────────────
@@ -303,7 +487,7 @@ async function main() {
     data: {
       title: 'Avengers: Endgame',
       description:
-        'After the devastating events of Infinity War, the Avengers assemble once more to reverse Thanos\' actions and restore balance to the universe.',
+        "After the devastating events of Infinity War, the Avengers assemble once more to reverse Thanos' actions and restore balance to the universe.",
       durationMinutes: 181,
       language: 'English',
       releaseDate: new Date('2025-04-26'),
@@ -315,7 +499,7 @@ async function main() {
     data: {
       title: 'Spider-Man: No Way Home',
       description:
-        'Peter Parker\'s identity is revealed, forcing him to seek help from Doctor Strange.',
+        "Peter Parker's identity is revealed, forcing him to seek help from Doctor Strange.",
       durationMinutes: 148,
       language: 'English',
       releaseDate: new Date('2025-12-17'),
@@ -358,6 +542,42 @@ async function main() {
     },
   });
 
+  const movie6 = await prisma.movie.create({
+    data: {
+      title: 'Oppenheimer',
+      description:
+        'The story of J. Robert Oppenheimer and his role in the development of the atomic bomb.',
+      durationMinutes: 180,
+      language: 'English',
+      releaseDate: new Date('2025-07-21'),
+      status: 'NOW_SHOWING',
+    },
+  });
+
+  const movie7 = await prisma.movie.create({
+    data: {
+      title: 'John Wick: Chapter 4',
+      description:
+        'John Wick uncovers a path to defeating The High Table in his quest for freedom.',
+      durationMinutes: 169,
+      language: 'English',
+      releaseDate: new Date('2025-03-24'),
+      status: 'NOW_SHOWING',
+    },
+  });
+
+  const movie8 = await prisma.movie.create({
+    data: {
+      title: 'Interstellar',
+      description:
+        "A team of explorers travel through a wormhole in space in an attempt to ensure humanity's survival.",
+      durationMinutes: 169,
+      language: 'English',
+      releaseDate: new Date('2024-11-07'),
+      status: 'NOW_SHOWING',
+    },
+  });
+
   // ── Showtimes ─────────────────────────────────────────────
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -371,13 +591,16 @@ async function main() {
     status: 'SCHEDULED' | 'CANCELLED' | 'FINISHED';
   }> = [];
 
-  const movies = [movie1, movie2, movie3];
-  const screens = [screen1, screen2, screen3, screen4];
+  const movies = [movie1, movie2, movie3, movie6, movie7, movie8];
+  const screens = [
+    screen1, screen2, screen3,
+    screen4, screen5, screen6,
+    screen7, screen8,
+  ];
 
   for (const movie of movies) {
-    for (let day = 0; day < 3; day++) {
+    for (let day = 0; day < 7; day++) {
       for (const screen of screens) {
-        // Showtimes: 10:00, 13:00, 16:00, 19:00, 22:00
         const hours = [10, 13, 16, 19, 22];
         for (const hour of hours) {
           const startTime = new Date(today);
@@ -388,7 +611,6 @@ async function main() {
           endTime.setMinutes(endTime.getMinutes() + movie.durationMinutes);
 
           const isPast = startTime < now;
-          const isFarFuture = day >= 2;
 
           showtimeData.push({
             movieId: movie.id,
@@ -456,8 +678,9 @@ async function main() {
 
   console.log('\n✅ Seed complete!');
   console.table(counts);
-  console.log('\n📧 Admin login: admin@cinema.com / Admin123!');
-  console.log('📧 User login:  user@cinema.com / User123!');
+  console.log('\n📧 Admin login:   admin@cinema.com / ' + adminPassword);
+  console.log('📧 User login:    user@cinema.com / ' + userPassword);
+  console.log('📧 Cashier login: cashier@cinema.com / ' + cashierPassword);
 }
 
 main()
