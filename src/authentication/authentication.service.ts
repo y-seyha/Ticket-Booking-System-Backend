@@ -944,18 +944,18 @@ export class AuthenticationService {
 
   private clearCookies(res: Response) {
     const isProduction = process.env.NODE_ENV === 'production';
+    const cookieDomain = isProduction ? '.yscinema.site' : undefined;
 
-    res.clearCookie('access_token', {
+    const cookieOptions = {
       httpOnly: true,
       secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-    });
+      sameSite: isProduction ? ('none' as const) : ('lax' as const),
+      domain: cookieDomain,
+      path: '/',
+    };
 
-    res.clearCookie('refresh_token', {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-    });
+    res.clearCookie('access_token', cookieOptions);
+    res.clearCookie('refresh_token', cookieOptions);
   }
 
   private detectDevice(req: any): string {

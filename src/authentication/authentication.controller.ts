@@ -359,21 +359,28 @@ export class AuthenticationController {
     return res.redirect(`${frontendUrl}/auth/oauth-success`);
   }
 
-  private setCookies(res: Response, tokens: any) {
-    const isProduction = process.env.NODE_ENV === 'production';
 
-    res.cookie('access_token', tokens.accessToken, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-      maxAge: 15 * 60 * 1000,
-    });
 
-    res.cookie('refresh_token', tokens.refreshToken, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-  }
+private setCookies(res: Response, tokens: { accessToken: string; refreshToken: string }) {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const cookieDomain = isProduction ? '.yscinema.site' : undefined;
+
+  const commonOptions = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? ('none' as const) : ('lax' as const),
+    domain: cookieDomain,
+    path: '/',
+  };
+
+  res.cookie('access_token', tokens.accessToken, {
+    ...commonOptions,
+    maxAge: 15 * 60 * 1000,
+  });
+
+  res.cookie('refresh_token', tokens.refreshToken, {
+    ...commonOptions,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+}
 }
