@@ -46,7 +46,6 @@ export class MailerService {
       throw new Error(`Failed to send verification email: ${error.message}`);
     }
 
-    console.log('📧 Resend verification email sent:', data);
     return data;
   }
 
@@ -56,7 +55,7 @@ export class MailerService {
     const resetUrl = new URL('/auth/reset-password', frontendUrl);
     resetUrl.searchParams.set('token', token);
 
-    console.log('Email Reset Link generated:', resetUrl.toString());
+    // console.log('Email Reset Link generated:', resetUrl.toString());
 
     const html = this.wrapEmail(
       'Reset Password',
