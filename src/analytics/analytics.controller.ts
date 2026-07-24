@@ -16,7 +16,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import type { Response, Request } from 'express';
 import { Roles } from '../authentication/decorators/role.decorator';
 import { RolesGuard } from '../authentication/guards/roles.guard';
-import { Role } from '@prisma/client';
+
 import { DashboardService } from './dashboard.service';
 import { AnalyticsEventService } from './analytics-event.service';
 import { ReportsService } from './reports.service';
@@ -41,7 +41,7 @@ export class AnalyticsController {
   ) {}
 
   @Get('dashboard/summary')
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get main dashboard KPIs' })
   @ApiBearerAuth()
   async getSummary() {
@@ -49,7 +49,7 @@ export class AnalyticsController {
   }
 
   @Get('dashboard/revenue')
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get revenue data with grouping' })
   @ApiBearerAuth()
   async getRevenue(@Query() query: DateRangeDto) {
@@ -61,7 +61,7 @@ export class AnalyticsController {
   }
 
   @Get('dashboard/bookings')
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get booking statistics' })
   @ApiBearerAuth()
   async getBookings(@Query() query: DateRangeDto) {
@@ -69,7 +69,7 @@ export class AnalyticsController {
   }
 
   @Get('dashboard/users')
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get user statistics' })
   @ApiBearerAuth()
   async getUsers(@Query() query: DateRangeDto) {
@@ -77,7 +77,7 @@ export class AnalyticsController {
   }
 
   @Get('dashboard/movies')
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get movie performance ranking' })
   @ApiBearerAuth()
   async getMovies(@Query() query: DateRangeDto) {
@@ -85,7 +85,7 @@ export class AnalyticsController {
   }
 
   @Get('dashboard/food-beverage')
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get food & beverage sales' })
   @ApiBearerAuth()
   async getFoodBeverage(@Query() query: DateRangeDto) {
@@ -93,7 +93,7 @@ export class AnalyticsController {
   }
 
   @Get('dashboard/occupancy')
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get seat occupancy data' })
   @ApiBearerAuth()
   async getOccupancy(@Query() query: DateRangeDto) {
@@ -101,7 +101,7 @@ export class AnalyticsController {
   }
 
   @Get('dashboard/peak-times')
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get peak booking times analysis' })
   @ApiBearerAuth()
   async getPeakTimes(@Query() query: DateRangeDto) {
@@ -166,7 +166,7 @@ export class AnalyticsController {
   }
 
   @Get('analytics/events')
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Query tracked analytics events' })
   @ApiBearerAuth()
   async getEvents(@Query() query: AnalyticsEventQueryDto) {
@@ -182,7 +182,7 @@ export class AnalyticsController {
   }
 
   @Get('analytics/events/summary')
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get event tracking summary' })
   @ApiBearerAuth()
   async getEventSummary(@Query() query: DateRangeDto) {
@@ -193,7 +193,7 @@ export class AnalyticsController {
   }
 
   @Get('analytics/reports/export')
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Export report as CSV' })
   @ApiBearerAuth()
   async exportReport(@Query() query: ExportReportDto, @Res() res: Response) {

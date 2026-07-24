@@ -34,6 +34,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { ReactivateAccountDto } from './dto/reactivate-account.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { RefreshResponse } from '../types';
 
 @ApiTags('Auth')
@@ -241,6 +242,17 @@ export class AuthenticationController {
       user: result.user,
       accessToken: result.accessToken,
     };
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change password for authenticated user' })
+  async changePassword(
+    @Body() dto: ChangePasswordDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.auth.changePassword(user.id, dto.currentPassword, dto.newPassword);
   }
 
   @Get('google')

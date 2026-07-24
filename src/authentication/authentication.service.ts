@@ -708,7 +708,7 @@ export class AuthenticationService {
     const payload = {
       sub: account.id,
       email: account.email,
-      role: account.role,
+      role: account.roleId,
       sid: sessionId,
     };
 
@@ -921,6 +921,37 @@ export class AuthenticationService {
     });
   }
 
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    this.logger.log(`Changing password for user: ${userId}`);
+
+    const account = await this.prisma.account.findUnique({
+      where: { id: userId },
+    });
+
+    if (!account) {
+      throw new BadRequestException('Account not found');
+    }
+
+    if (!account.passwordHash) {
+      throw new BadRequestException('Cannot change password for OAuth-only accounts');
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, account.passwordHash);
+    if (!isMatch) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+
+    await this.prisma.account.update({
+      where: { id: userId },
+      data: { passwordHash: newHash },
+    });
+
+    this.logger.log(`Password changed successfully for user: ${userId}`);
+
+    return { message: 'Password changed successfully' };
+  }
 
   private handlePrismaError(error: any): never {
     if (error?.code === 'P2002') {

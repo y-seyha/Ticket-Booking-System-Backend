@@ -24,10 +24,11 @@ import { MoviesService } from './movies.service';
 import { CreateMovieDto } from './dto/create-movie.dto';
 import { UpdateMovieDto } from './dto/update-movie.dto';
 
-import { Role } from '@prisma/client';
 import { RolesGuard } from '../authentication/guards/roles.guard';
 import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
 import { Roles } from '../authentication/decorators/role.decorator';
+import { PermissionsGuard } from '../authentication/guards/permissions.guard';
+import { Permissions } from '../authentication/decorators/permissions.decorator';
 import { MovieQueryDto } from './dto/ movie-query.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../authentication/decorators/current-user.decorator';
@@ -41,7 +42,9 @@ export class MoviesController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
+  @Permissions('canManageMovies')
+  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create movie with poster upload' })
   @UseInterceptors(
@@ -59,7 +62,9 @@ export class MoviesController {
 
   @Patch(':id/status')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
+  @Permissions('canManageMovies')
+  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Manually update movie status (Admin only)' })
   updateStatus(@Param('id') id: string, @Body() dto: UpdateMovieStatusDto) {
@@ -86,7 +91,9 @@ export class MoviesController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
+  @Permissions('canManageMovies')
+  @UseGuards(PermissionsGuard)
   @UseInterceptors(FileInterceptor('poster'))
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update movie (Admin only)' })
@@ -101,7 +108,9 @@ export class MoviesController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
+  @Permissions('canManageMovies')
+  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete movie (Admin only)' })
   remove(@Param('id') id: string) {

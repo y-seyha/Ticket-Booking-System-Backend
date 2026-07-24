@@ -22,10 +22,11 @@ import {
 import { UserService } from './user.service';
 import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
 import { CurrentUser } from '../authentication/decorators/current-user.decorator';
-import { Role } from '@prisma/client';
 import { RolesGuard } from '../authentication/guards/roles.guard';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Roles } from '../authentication/decorators/role.decorator';
+import { PermissionsGuard } from '../authentication/guards/permissions.guard';
+import { Permissions } from '../authentication/decorators/permissions.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Users')
@@ -59,8 +60,10 @@ export class UserController {
 
   // ADMIN SECTION
   @Get()
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @UseGuards(RolesGuard)
+  @Permissions('canManageUsers')
+  @UseGuards(PermissionsGuard)
   @ApiOperation({ summary: 'Get all users (admin only)' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -69,8 +72,10 @@ export class UserController {
   }
 
   @Get(':id')
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @UseGuards(RolesGuard)
+  @Permissions('canManageUsers')
+  @UseGuards(PermissionsGuard)
   @ApiOperation({ summary: 'Get user by id (admin only)' })
   @ApiParam({ name: 'id' })
   getUserById(@Param('id') id: string) {
@@ -78,36 +83,44 @@ export class UserController {
   }
 
   @Patch(':id/ban')
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @UseGuards(RolesGuard)
+  @Permissions('canManageUsers')
+  @UseGuards(PermissionsGuard)
   @ApiOperation({ summary: 'Ban user' })
   banUser(@Param('id') id: string, @CurrentUser() user: any) {
     return this.userService.banUser(id, user.id);
   }
 
   @Patch(':id/unban')
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @UseGuards(RolesGuard)
+  @Permissions('canManageUsers')
+  @UseGuards(PermissionsGuard)
   @ApiOperation({ summary: 'Unban user' })
   unbanUser(@Param('id') id: string) {
     return this.userService.unbanUser(id);
   }
 
   @Patch(':id/role')
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @UseGuards(RolesGuard)
+  @Permissions('canManageUsers')
+  @UseGuards(PermissionsGuard)
   @ApiOperation({ summary: 'Change user role' })
   changeRole(
     @Param('id') id: string,
-    @Body('role') role: Role,
+    @Body('roleId') roleId: string,
     @CurrentUser() user: any,
   ) {
-    return this.userService.changeRole(id, role, user.id);
+    return this.userService.changeRole(id, roleId, user.id);
   }
 
   @Delete(':id')
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @UseGuards(RolesGuard)
+  @Permissions('canManageUsers')
+  @UseGuards(PermissionsGuard)
   @ApiOperation({ summary: 'Soft delete user' })
   deleteUser(@Param('id') id: string, @CurrentUser() user: any) {
     return this.userService.deleteUser(id, user.id);

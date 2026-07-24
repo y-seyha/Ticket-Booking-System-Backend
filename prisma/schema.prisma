@@ -41,10 +41,25 @@ enum TwoFactorMethod {
   EMAIL
 }
 
-enum Role {
-  ADMIN
-  USER
-  CASHIER
+model Role {
+  id          String    @id
+  name        String
+  description String?
+  isSystem    Boolean   @default(false)
+  permissions Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  accounts    Account[]
+}
+
+model SystemSetting {
+  key         String   @id
+  value       String
+  type        String   @default("string")
+  description String?
+  category    String   @default("general")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 enum AuthProvider {
@@ -129,7 +144,8 @@ model Account {
   id                  String               @id @default(uuid())
   email               String               @unique
   passwordHash        String?
-  role                Role                 @default(USER)
+  roleId              String               @default("USER")
+  role                Role                 @relation(fields: [roleId], references: [id])
   status              AccountStatus        @default(ACTIVE)
   emailVerified       Boolean              @default(false)
   phoneVerified       Boolean              @default(false)

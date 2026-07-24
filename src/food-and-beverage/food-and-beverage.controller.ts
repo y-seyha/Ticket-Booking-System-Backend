@@ -9,10 +9,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
+
 import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
 import { RolesGuard } from '../authentication/guards/roles.guard';
 import { Roles } from '../authentication/decorators/role.decorator';
+import { PermissionsGuard } from '../authentication/guards/permissions.guard';
+import { Permissions } from '../authentication/decorators/permissions.decorator';
 import { CurrentUser } from '../authentication/decorators/current-user.decorator';
 import { FoodAndBeverageService } from './food-and-beverage.service';
 import { CreateFoodCategoryDto } from './dto/create-food-category.dto';
@@ -123,7 +125,9 @@ export class FoodAndBeverageController {
   /* ─── Admin Endpoints ────────────────────────────── */
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
+  @Permissions('canManageMovies')
+  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @Post('categories')
   @ApiOperation({ summary: 'Create a food category' })
@@ -132,7 +136,7 @@ export class FoodAndBeverageController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @ApiBearerAuth()
   @Get('categories')
   @ApiOperation({ summary: 'Get all categories (admin)' })
@@ -141,7 +145,9 @@ export class FoodAndBeverageController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
+  @Permissions('canManageMovies')
+  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @Patch('categories/:id')
   @ApiOperation({ summary: 'Update a food category' })
@@ -150,7 +156,9 @@ export class FoodAndBeverageController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
+  @Permissions('canManageMovies')
+  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @Patch('categories/:id/toggle-status')
   @ApiOperation({ summary: 'Toggle category active status' })
@@ -159,7 +167,9 @@ export class FoodAndBeverageController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
+  @Permissions('canManageMovies')
+  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @Delete('categories/:id')
   @ApiOperation({ summary: 'Delete a food category' })
@@ -168,7 +178,9 @@ export class FoodAndBeverageController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
+  @Permissions('canManageMovies')
+  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @Post('items')
   @ApiOperation({ summary: 'Create a food item' })
@@ -177,7 +189,9 @@ export class FoodAndBeverageController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
+  @Permissions('canManageMovies')
+  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @Post('items/bulk')
   @ApiOperation({
@@ -188,7 +202,9 @@ export class FoodAndBeverageController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
+  @Permissions('canManageMovies')
+  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @Patch('items/:id')
   @ApiOperation({ summary: 'Update a food item' })
@@ -197,7 +213,9 @@ export class FoodAndBeverageController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
+  @Permissions('canManageMovies')
+  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @Patch('items/:id/toggle-status')
   @ApiOperation({ summary: 'Toggle item active status' })
@@ -206,7 +224,9 @@ export class FoodAndBeverageController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
+  @Permissions('canManageMovies')
+  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @Delete('items/:id')
   @ApiOperation({ summary: 'Delete a food item' })

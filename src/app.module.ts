@@ -21,6 +21,9 @@ import { SearchModule } from './search/search.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { NotificationModule } from './notification/notification.module';
 import { FoodAndBeverageModule } from './food-and-beverage/food-and-beverage.module';
+import { RolesModule } from './roles/roles.module';
+import { SettingsModule } from './settings/settings.module';
+import { PermissionsGuard } from './authentication/guards/permissions.guard';
 import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
@@ -48,8 +51,10 @@ import { ScheduleModule } from '@nestjs/schedule';
     AnalyticsModule,
     NotificationModule,
     FoodAndBeverageModule,
+    RolesModule,
+    SettingsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, PermissionsGuard],
 })
 export class AppModule {}

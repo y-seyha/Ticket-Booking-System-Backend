@@ -91,8 +91,36 @@ async function main() {
   await prisma.oAuthAccount.deleteMany();
   await prisma.userProfile.deleteMany();
   await prisma.account.deleteMany();
+  await prisma.systemSetting.deleteMany();
+  await prisma.role.deleteMany();
 
   console.log('Seeding data...');
+
+  // ── Roles ──────────────────────────────────────────────────
+  await prisma.role.createMany({
+    data: [
+      { id: 'ADMIN', name: 'Administrator', description: 'Full system access with all permissions', isSystem: true, permissions: { canManageUsers: true, canManageMovies: true, canManageBookings: true } },
+      { id: 'USER', name: 'Customer', description: 'Standard user account', isSystem: true, permissions: { canManageUsers: false, canManageMovies: false, canManageBookings: false } },
+      { id: 'CASHIER', name: 'Cashier', description: 'Point of sale operator', isSystem: true, permissions: { canManageUsers: false, canManageMovies: false, canManageBookings: true } },
+    ],
+  });
+
+  // ── System Settings ─────────────────────────────────────────
+  await prisma.systemSetting.createMany({
+    data: [
+      { key: 'site_name', value: 'YS Cinema', type: 'string', description: 'Site display name', category: 'general' },
+      { key: 'timezone', value: 'Asia/Phnom_Penh', type: 'string', description: 'Default timezone', category: 'general' },
+      { key: 'date_format', value: 'DD/MM/YYYY', type: 'string', description: 'Date display format', category: 'general' },
+      { key: 'booking_expiry_minutes', value: '5', type: 'number', description: 'Minutes before pending booking expires', category: 'booking' },
+      { key: 'max_tickets_per_booking', value: '10', type: 'number', description: 'Maximum tickets per booking', category: 'booking' },
+      { key: 'seat_lock_timeout_seconds', value: '300', type: 'number', description: 'Seconds before seat lock expires', category: 'booking' },
+      { key: 'admin_email', value: '', type: 'string', description: 'Admin notification email', category: 'notification' },
+      { key: 'booking_confirmation', value: 'true', type: 'boolean', description: 'Send booking confirmation notifications', category: 'notification' },
+      { key: 'password_min_length', value: '8', type: 'number', description: 'Minimum password length', category: 'security' },
+      { key: 'session_timeout_minutes', value: '60', type: 'number', description: 'Session timeout in minutes', category: 'security' },
+      { key: 'max_login_attempts', value: '5', type: 'number', description: 'Max failed login attempts before lockout', category: 'security' },
+    ],
+  });
 
   // ── Accounts ──────────────────────────────────────────────
   const adminPassword = generateStrongPassword(32);
@@ -107,7 +135,7 @@ async function main() {
     data: {
       email: 'admin@cinema.com',
       passwordHash: adminPasswordHash,
-      role: 'ADMIN',
+      roleId: 'ADMIN',
       status: 'ACTIVE',
       emailVerified: true,
       profile: {
@@ -125,7 +153,7 @@ async function main() {
     data: {
       email: 'user@cinema.com',
       passwordHash: userPasswordHash,
-      role: 'USER',
+      roleId: 'USER',
       status: 'ACTIVE',
       emailVerified: true,
       profile: {
@@ -143,7 +171,7 @@ async function main() {
     data: {
       email: 'cashier@cinema.com',
       passwordHash: cashierPasswordHash,
-      role: 'CASHIER',
+      roleId: 'CASHIER',
       status: 'ACTIVE',
       emailVerified: true,
       profile: {

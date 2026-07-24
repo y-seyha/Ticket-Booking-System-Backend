@@ -15,7 +15,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import {MovieStatus, Role, ShowtimeStatus} from '@prisma/client';
+import {MovieStatus, ShowtimeStatus} from '@prisma/client';
 
 import { ShowtimeService } from './showtime.service';
 import { CreateShowtimeDto } from './dto/create-showtime.dto';
@@ -24,6 +24,8 @@ import { UpdateShowtimeDto } from './dto/update-showtime.dto';
 import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
 import { RolesGuard } from '../authentication/guards/roles.guard';
 import { Roles } from '../authentication/decorators/role.decorator';
+import { PermissionsGuard } from '../authentication/guards/permissions.guard';
+import { Permissions } from '../authentication/decorators/permissions.decorator';
 import { CreateBulkScheduleDto } from './dto/create-bulk-showtime.dto';
 
 @ApiTags('Showtimes')
@@ -34,7 +36,9 @@ export class ShowtimeController {
 
   @Post('bulk')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
+  @Permissions('canManageBookings')
+  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Bulk generate showtime matrix (Admin only)' })
   @ApiResponse({
@@ -55,7 +59,9 @@ export class ShowtimeController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
+  @Permissions('canManageBookings')
+  @UseGuards(PermissionsGuard)
   @ApiOperation({ summary: 'Create showtime' })
   @ApiResponse({ status: 201, description: 'Showtime created successfully' })
   create(@Body() dto: CreateShowtimeDto) {
@@ -99,7 +105,9 @@ export class ShowtimeController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
+  @Permissions('canManageBookings')
+  @UseGuards(PermissionsGuard)
   @ApiOperation({ summary: 'Update showtime' })
   update(@Param('id') id: string, @Body() dto: UpdateShowtimeDto) {
     return this.showtimeService.update(id, dto);
@@ -120,7 +128,9 @@ export class ShowtimeController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
+  @Permissions('canManageBookings')
+  @UseGuards(PermissionsGuard)
   @ApiOperation({ summary: 'Delete showtime' })
   remove(@Param('id') id: string) {
     return this.showtimeService.remove(id);

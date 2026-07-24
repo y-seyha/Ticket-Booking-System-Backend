@@ -33,7 +33,6 @@ import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
 import { RolesGuard } from '../authentication/guards/roles.guard';
 import { Roles } from '../authentication/decorators/role.decorator';
 
-import { Role } from '@prisma/client';
 import { CurrentUser } from '../authentication/decorators/current-user.decorator';
 
 @ApiTags('Theater')
@@ -43,7 +42,7 @@ export class TheaterController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a theater (Admin only)' })
   @ApiConsumes('multipart/form-data')
@@ -97,7 +96,7 @@ export class TheaterController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update theater (Admin only)' })
   @ApiConsumes('multipart/form-data')
@@ -128,7 +127,7 @@ export class TheaterController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('ADMIN')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete theater (Admin only)' })
   @ApiResponse({ status: 200, description: 'Theater deleted' })

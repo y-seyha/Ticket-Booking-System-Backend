@@ -9,7 +9,6 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import {
   AccountStatus,
-  Role,
   Account,
   UserProfile,
   UserProfileStatus,
@@ -28,11 +27,19 @@ export class UserService {
     private readonly fileUploadService: FileUploadService,
   ) {}
 
+  private transformAccount(account: any) {
+    if (!account) return account;
+    const { roleId, ...rest } = account;
+    return { ...rest, role: roleId };
+  }
+
+  private transformAccounts(accounts: any[]) {
+    return accounts.map(a => this.transformAccount(a));
+  }
+
   async getMyProfile(
     accountId: string,
-  ): Promise<
-    Account & { profile: (UserProfile & { avatar: File | null }) | null }
-  > {
+  ): Promise<Account & { profile: (UserProfile & { avatar: File | null }) | null }> {
     try {
       this.logger.log(`Fetching profile for accountId=${accountId}`);
 
@@ -52,7 +59,7 @@ export class UserService {
         throw new NotFoundException('User not found');
       }
 
-      return user;
+      return this.transformAccount(user);
     } catch (error) {
       this.logger.error(
         `Failed to fetch profile for ${accountId}`,
@@ -70,7 +77,6 @@ export class UserService {
     try {
       this.logger.log(`Updating profile for accountId=${accountId}`);
 
-      // Fix: explicitly type this as your Prisma entity model type
       let avatarFile: File | null = null;
 
       if (file) {
@@ -143,7 +149,7 @@ export class UserService {
 
       this.logger.log(`Account disabled: ${accountId}`);
 
-      return updated;
+      return this.transformAccount(updated);
     } catch (error) {
       this.logger.error(
         `Failed to disable account ${accountId}`,
@@ -175,7 +181,7 @@ export class UserService {
 
       const total = await this.prisma.account.count();
       console.log({ total });
-      return users;
+      return this.transformAccounts(users);
     } catch (error) {
       this.logger.error('Failed to fetch users', (error as Error).stack);
       throw new InternalServerErrorException('Failed to fetch users');
@@ -195,7 +201,7 @@ export class UserService {
         throw new NotFoundException('User not found');
       }
 
-      return user;
+      return this.transformAccount(user);
     } catch (error) {
       this.logger.error(`Failed to fetch user ${id}`, (error as Error).stack);
 
@@ -221,7 +227,7 @@ export class UserService {
         throw new NotFoundException('User not found');
       }
 
-      if (user.role === Role.ADMIN) {
+      if (user.roleId === 'ADMIN') {
         throw new ForbiddenException('Cannot ban another admin');
       }
 
@@ -229,12 +235,14 @@ export class UserService {
         throw new BadRequestException('User already banned');
       }
 
-      return await this.prisma.account.update({
+      const updated = await this.prisma.account.update({
         where: { id: targetUserId },
         data: {
           status: AccountStatus.SUSPENDED,
         },
       });
+
+      return this.transformAccount(updated);
     } catch (error) {
       this.logger.error(
         `Failed to ban user ${targetUserId}`,
@@ -257,12 +265,14 @@ export class UserService {
     try {
       this.logger.log(`Unbanning user ${targetUserId}`);
 
-      return await this.prisma.account.update({
+      const updated = await this.prisma.account.update({
         where: { id: targetUserId },
         data: {
           status: AccountStatus.ACTIVE,
         },
       });
+
+      return this.transformAccount(updated);
     } catch (error) {
       this.logger.error(
         `Failed to unban user ${targetUserId}`,
@@ -275,12 +285,12 @@ export class UserService {
 
   async changeRole(
     targetUserId: string,
-    role: Role,
+    roleId: string,
     adminId: string,
   ): Promise<Account> {
     try {
       this.logger.log(
-        `Admin ${adminId} changing role of ${targetUserId} → ${role}`,
+        `Admin ${adminId} changing role of ${targetUserId} \u2192 ${roleId}`,
       );
 
       if (targetUserId === adminId) {
@@ -295,10 +305,21 @@ export class UserService {
         throw new NotFoundException('User not found');
       }
 
-      return await this.prisma.account.update({
-        where: { id: targetUserId },
-        data: { role },
+      const role = await this.prisma.role.findUnique({
+        where: { id: roleId },
       });
+
+      if (!role) {
+        throw new BadRequestException('Role not found');
+      }
+
+      const updated = await this.prisma.account.update({
+        where: { id: targetUserId },
+        data: { roleId },
+        include: { role: true },
+      });
+
+      return this.transformAccount(updated);
     } catch (error) {
       this.logger.error(
         `Failed to change role for ${targetUserId}`,
@@ -324,12 +345,14 @@ export class UserService {
         throw new BadRequestException('You cannot delete yourself');
       }
 
-      return await this.prisma.account.update({
+      const updated = await this.prisma.account.update({
         where: { id: targetUserId },
         data: {
           status: AccountStatus.DELETED,
         },
       });
+
+      return this.transformAccount(updated);
     } catch (error) {
       this.logger.error(
         `Failed to delete user ${targetUserId}`,

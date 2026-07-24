@@ -17,12 +17,12 @@ import { UpdateScreenDto } from './dto/update-screen.dto';
 
 import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
 import { Roles } from '../authentication/decorators/role.decorator';
-import { Role } from '@prisma/client';
+
 
 @ApiTags('Screens')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Roles(Role.ADMIN)
+@Roles('ADMIN')
 @Controller('screens')
 export class ScreenController {
   constructor(private readonly screenService: ScreenService) {}

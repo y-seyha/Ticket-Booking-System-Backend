@@ -4,12 +4,11 @@ import { Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Role } from '@prisma/client';
 
 interface JwtPayload {
   sub: string;
   email: string;
-  role: Role;
+  role: string;
 }
 
 interface RequestWithCookies extends Request {
@@ -44,7 +43,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       select: {
         id: true,
         email: true,
-        role: true,
+        roleId: true,
         profile: {
           select: {
             phone: true,
@@ -60,7 +59,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       id: account.id,
       email: account.email,
-      role: account.role,
+      role: account.roleId,
       phone: account.profile?.phone,
     };
   }

@@ -19,7 +19,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 
-import { Role, SeatType } from '@prisma/client';
+import { SeatType } from '@prisma/client';
 import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
 import { RolesGuard } from '../authentication/guards/roles.guard';
 import { Roles } from '../authentication/decorators/role.decorator';
@@ -27,7 +27,7 @@ import { Roles } from '../authentication/decorators/role.decorator';
 @ApiTags('Seat Pricing (Admin)')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
+@Roles('ADMIN')
 @Controller('seat-pricing')
 export class SeatPricingController {
   constructor(private readonly service: SeatPricingService) {}

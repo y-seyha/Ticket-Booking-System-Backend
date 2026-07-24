@@ -312,7 +312,7 @@ export class DashboardService {
 
     const [byRole, registrations, activeUsers] = await Promise.all([
       this.prisma.account.groupBy({
-        by: ['role'],
+        by: ['roleId'],
         _count: true,
       }),
       this.getRegistrationsByDay(f, t),
@@ -323,7 +323,7 @@ export class DashboardService {
 
     return {
       byRole: byRole.map((r) => ({
-        role: r.role,
+        role: r.roleId,
         count: r._count,
       })),
       registrations,

@@ -363,7 +363,7 @@ export class SeatService {
       user: {
         id: user.id,
         email: user.email,
-        role: user.role,
+        role: user.roleId,
         profile: user.profile
           ? {
               firstName: user.profile.firstName,
