@@ -264,8 +264,20 @@ describe('SeatService', () => {
   describe('cleanupExpiredLocks', () => {
     it('should delete expired locks and log count', async () => {
       mockPrisma.seatLock.findMany.mockResolvedValue([
-        { id: 'l1', showtimeId: 'st1', seatId: 's1', accountId: 'acc1', expiresAt: new Date(Date.now() - 10000) },
-        { id: 'l2', showtimeId: 'st1', seatId: 's2', accountId: 'acc2', expiresAt: new Date(Date.now() - 5000) },
+        {
+          id: 'l1',
+          showtimeId: 'st1',
+          seatId: 's1',
+          accountId: 'acc1',
+          expiresAt: new Date(Date.now() - 10000),
+        },
+        {
+          id: 'l2',
+          showtimeId: 'st1',
+          seatId: 's2',
+          accountId: 'acc2',
+          expiresAt: new Date(Date.now() - 5000),
+        },
       ]);
       mockPrisma.seatLock.deleteMany.mockResolvedValue({ count: 2 });
 

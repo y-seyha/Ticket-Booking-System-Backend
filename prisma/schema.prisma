@@ -152,6 +152,7 @@ model Account {
   tickets             Ticket[]
   deviceTokens        DeviceToken[]
   notifications       Notification[]
+  analyticsEvents     AnalyticsEvent[]
 }
 
 model UserProfile {
@@ -610,4 +611,54 @@ model Notification {
   @@index([accountId])
   @@index([accountId, readAt])
   @@index([createdAt])
+}
+
+enum AnalyticsEventSource {
+  FRONTEND
+  BACKEND
+  GA4_WEBHOOK
+}
+
+model DashboardSnapshot {
+  id               String   @id @default(uuid())
+  date             DateTime @unique
+  totalRevenue     Decimal  @default(0) @db.Decimal(12, 2)
+  ticketRevenue    Decimal  @default(0) @db.Decimal(12, 2)
+  foodRevenue      Decimal  @default(0) @db.Decimal(12, 2)
+  totalBookings    Int      @default(0)
+  confirmedBookings Int     @default(0)
+  cancelledBookings Int     @default(0)
+  expiredBookings  Int      @default(0)
+  totalUsers       Int      @default(0)
+  newUsers         Int      @default(0)
+  totalMovies      Int      @default(0)
+  totalShowtimes   Int      @default(0)
+  avgOccupancyRate Float    @default(0)
+  createdAt        DateTime @default(now())
+
+  @@index([date])
+}
+
+model AnalyticsEvent {
+  id        String               @id @default(uuid())
+  name      String
+  category  String?
+  label     String?
+  value     Float?
+  metadata  Json?
+  accountId String?
+  ipAddress String?
+  userAgent String?
+  sessionId String?
+  pageUrl   String?
+  source    AnalyticsEventSource @default(FRONTEND)
+
+  createdAt DateTime @default(now())
+
+  account Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([name])
+  @@index([source])
+  @@index([accountId])
 }

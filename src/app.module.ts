@@ -18,6 +18,7 @@ import { CheckoutModule } from './checkout/checkout.module';
 import { PaymentModule } from './payment/payment.module';
 import { TicketModule } from './ticket/ticket.module';
 import { SearchModule } from './search/search.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { NotificationModule } from './notification/notification.module';
 import { FoodAndBeverageModule } from './food-and-beverage/food-and-beverage.module';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -44,6 +45,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     PaymentModule,
     TicketModule,
     SearchModule,
+    AnalyticsModule,
     NotificationModule,
     FoodAndBeverageModule,
   ],

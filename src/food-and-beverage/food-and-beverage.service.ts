@@ -53,13 +53,17 @@ export class FoodAndBeverageService {
   }
 
   async updateCategory(id: string, dto: UpdateFoodCategoryDto) {
-    const existing = await this.prisma.foodCategory.findUnique({ where: { id } });
+    const existing = await this.prisma.foodCategory.findUnique({
+      where: { id },
+    });
     if (!existing) throw new NotFoundException('Food category not found');
     return this.prisma.foodCategory.update({ where: { id }, data: dto });
   }
 
   async deleteCategory(id: string) {
-    const existing = await this.prisma.foodCategory.findUnique({ where: { id } });
+    const existing = await this.prisma.foodCategory.findUnique({
+      where: { id },
+    });
     if (!existing) throw new NotFoundException('Food category not found');
     await this.prisma.foodCategory.delete({ where: { id } });
   }
@@ -110,17 +114,23 @@ export class FoodAndBeverageService {
       where: { id },
       data: { isActive: !existing.isActive },
     });
-    return { message: `Item ${updated.isActive ? 'activated' : 'deactivated'}` };
+    return {
+      message: `Item ${updated.isActive ? 'activated' : 'deactivated'}`,
+    };
   }
 
   async toggleCategoryStatus(id: string) {
-    const existing = await this.prisma.foodCategory.findUnique({ where: { id } });
+    const existing = await this.prisma.foodCategory.findUnique({
+      where: { id },
+    });
     if (!existing) throw new NotFoundException('Food category not found');
     const updated = await this.prisma.foodCategory.update({
       where: { id },
       data: { isActive: !existing.isActive },
     });
-    return { message: `Category ${updated.isActive ? 'activated' : 'deactivated'}` };
+    return {
+      message: `Category ${updated.isActive ? 'activated' : 'deactivated'}`,
+    };
   }
 
   async getAllItems() {
@@ -171,7 +181,9 @@ export class FoodAndBeverageService {
       throw new NotFoundException('One or more food items not found');
     }
 
-    const foodMap = Object.fromEntries(foodItems.map((f) => [f.id, Number(f.price)]));
+    const foodMap = Object.fromEntries(
+      foodItems.map((f) => [f.id, Number(f.price)]),
+    );
 
     const result = await this.prisma.$transaction(async (tx) => {
       const totalAmount = dto.items.reduce(
@@ -262,8 +274,10 @@ export class FoodAndBeverageService {
       },
     });
     if (!booking) throw new NotFoundException('Booking not found');
-    if (booking.accountId !== accountId) throw new ForbiddenException('Not your order');
-    if (booking.showtimeId) throw new BadRequestException('This is not a food-only order');
+    if (booking.accountId !== accountId)
+      throw new ForbiddenException('Not your order');
+    if (booking.showtimeId)
+      throw new BadRequestException('This is not a food-only order');
 
     return {
       bookingId: booking.id,
@@ -284,12 +298,17 @@ export class FoodAndBeverageService {
 
   /* ─── Booking Food Items ─────────────────────────── */
 
-  async addFoodItems(bookingId: string, dto: AddBookingFoodItemsDto, accountId: string) {
+  async addFoodItems(
+    bookingId: string,
+    dto: AddBookingFoodItemsDto,
+    accountId: string,
+  ) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
     });
     if (!booking) throw new NotFoundException('Booking not found');
-    if (booking.accountId !== accountId) throw new ForbiddenException('Not your booking');
+    if (booking.accountId !== accountId)
+      throw new ForbiddenException('Not your booking');
     if (booking.status !== BookingStatus.PENDING) {
       throw new BadRequestException('Can only add food to PENDING bookings');
     }
@@ -302,7 +321,9 @@ export class FoodAndBeverageService {
       throw new NotFoundException('One or more food items not found');
     }
 
-    const foodMap = Object.fromEntries(foodItems.map((f) => [f.id, Number(f.price)]));
+    const foodMap = Object.fromEntries(
+      foodItems.map((f) => [f.id, Number(f.price)]),
+    );
 
     return this.prisma.$transaction(async (tx) => {
       const created = await Promise.all(
@@ -340,7 +361,8 @@ export class FoodAndBeverageService {
       where: { id: bookingId },
     });
     if (!booking) throw new NotFoundException('Booking not found');
-    if (booking.accountId !== accountId) throw new ForbiddenException('Not your booking');
+    if (booking.accountId !== accountId)
+      throw new ForbiddenException('Not your booking');
 
     return this.prisma.bookingFoodItem.findMany({
       where: { bookingId },
@@ -353,7 +375,8 @@ export class FoodAndBeverageService {
       where: { id: bookingId },
     });
     if (!booking) throw new NotFoundException('Booking not found');
-    if (booking.accountId !== accountId) throw new ForbiddenException('Not your booking');
+    if (booking.accountId !== accountId)
+      throw new ForbiddenException('Not your booking');
 
     const existing = await this.prisma.bookingFoodItem.findUnique({
       where: { id: itemId },

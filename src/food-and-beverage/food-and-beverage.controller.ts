@@ -8,11 +8,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
 import { RolesGuard } from '../authentication/guards/roles.guard';
@@ -101,10 +97,7 @@ export class FoodAndBeverageController {
   @ApiBearerAuth()
   @Post('order')
   @ApiOperation({ summary: 'Create a standalone food-only order' })
-  createFoodOrder(
-    @Body() dto: CreateFoodOrderDto,
-    @CurrentUser() user: any,
-  ) {
+  createFoodOrder(@Body() dto: CreateFoodOrderDto, @CurrentUser() user: any) {
     return this.fbService.createFoodOrder(dto, user.id);
   }
 
@@ -152,10 +145,7 @@ export class FoodAndBeverageController {
   @ApiBearerAuth()
   @Patch('categories/:id')
   @ApiOperation({ summary: 'Update a food category' })
-  updateCategory(
-    @Param('id') id: string,
-    @Body() dto: UpdateFoodCategoryDto,
-  ) {
+  updateCategory(@Param('id') id: string, @Body() dto: UpdateFoodCategoryDto) {
     return this.fbService.updateCategory(id, dto);
   }
 
@@ -190,7 +180,9 @@ export class FoodAndBeverageController {
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @Post('items/bulk')
-  @ApiOperation({ summary: 'Bulk create a food item across multiple categories' })
+  @ApiOperation({
+    summary: 'Bulk create a food item across multiple categories',
+  })
   createBulkItems(@Body() dto: CreateBulkFoodItemDto) {
     return this.fbService.createBulkItems(dto);
   }
