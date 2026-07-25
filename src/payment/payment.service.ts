@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { BookingStatus, PaymentProvider, PaymentStatus } from '@prisma/client';
+import { BookingStatus, PaymentProvider, PaymentStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   PayDto,
@@ -15,6 +15,51 @@ import {
 import { SeatGateway } from '../seat/seat.gateway';
 import { TicketService } from '../ticket/ticket.service';
 import { NotificationService } from '../notification/notification.service';
+import { AdminPaymentsQueryDto, AdminPaymentExportDto } from './dto/admin-payments-query.dto';
+
+const adminFindAllInclude = {
+  booking: {
+    include: {
+      account: { include: { profile: true } },
+      showtime: { include: { movie: true } },
+    },
+  },
+} satisfies Prisma.PaymentInclude;
+
+const adminFindOneInclude = {
+  booking: {
+    include: {
+      account: { include: { profile: true } },
+      showtime: {
+        include: {
+          movie: true,
+          screen: { include: { theater: true } },
+        },
+      },
+      bookingSeats: {
+        include: { seat: true, ticket: true },
+      },
+      foodItems: { include: { foodItem: true } },
+      tickets: true,
+    },
+  },
+} satisfies Prisma.PaymentInclude;
+
+const adminExportInclude = {
+  booking: {
+    include: {
+      account: { include: { profile: true } },
+    },
+  },
+} satisfies Prisma.PaymentInclude;
+
+const adminFindAllArgs = { include: adminFindAllInclude };
+const adminFindOneArgs = { include: adminFindOneInclude };
+const adminExportArgs = { include: adminExportInclude };
+
+type AdminFindAllPayment = Prisma.PaymentGetPayload<typeof adminFindAllArgs>;
+type AdminFindOnePayment = Prisma.PaymentGetPayload<typeof adminFindOneArgs>;
+type AdminExportPayment = Prisma.PaymentGetPayload<typeof adminExportArgs>;
 
 @Injectable()
 export class PaymentService {
@@ -227,6 +272,240 @@ export class PaymentService {
       }
 
       throw new InternalServerErrorException('Payment processing failed');
+    }
+  }
+
+  async adminFindAll(query: AdminPaymentsQueryDto) {
+    try {
+      const where: Prisma.PaymentWhereInput = {};
+
+      if (query.status) {
+        where.status = query.status as PaymentStatus;
+      }
+      if (query.provider) {
+        where.provider = query.provider;
+      }
+      if (query.from || query.to) {
+        where.createdAt = {};
+        if (query.from) where.createdAt.gte = new Date(query.from);
+        if (query.to) {
+          const toEnd = new Date(query.to);
+          toEnd.setHours(23, 59, 59, 999);
+          where.createdAt.lte = toEnd;
+        }
+      }
+
+      const page = query.page || 1;
+      const limit = query.limit || 20;
+      const skip = (page - 1) * limit;
+
+      const [data, total] = await Promise.all([
+        this.prisma.payment.findMany({
+          where,
+          ...adminFindAllArgs,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+        }),
+        this.prisma.payment.count({ where }),
+      ]);
+
+      return {
+        data: data.map((p: AdminFindAllPayment) => ({
+          id: p.id,
+          provider: p.provider,
+          amount: Number(p.amount),
+          currency: p.currency,
+          status: p.status,
+          transactionRef: p.transactionRef,
+          paidAt: p.paidAt,
+          expiresAt: p.expiresAt,
+          createdAt: p.createdAt,
+          booking: p.booking
+            ? {
+                id: p.booking.id,
+                bookingCode: p.booking.bookingCode,
+                totalPrice: Number(p.booking.totalPrice),
+                status: p.booking.status,
+                account: p.booking.account
+                  ? {
+                      email: p.booking.account.email,
+                      profile: p.booking.account.profile
+                        ? {
+                            firstName: p.booking.account.profile.firstName,
+                            lastName: p.booking.account.profile.lastName,
+                          }
+                        : null,
+                    }
+                  : null,
+                showtime: p.booking.showtime
+                  ? {
+                      startTime: p.booking.showtime.startTime,
+                      movie: p.booking.showtime.movie
+                        ? { title: p.booking.showtime.movie.title }
+                        : null,
+                    }
+                  : null,
+              }
+            : null,
+        })),
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Failed to fetch payments: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Failed to fetch payments');
+    }
+  }
+
+  async adminFindOne(id: string) {
+    try {
+      const payment = await this.prisma.payment.findUnique({
+        where: { id },
+        ...adminFindOneArgs,
+      }) as AdminFindOnePayment | null;
+
+      if (!payment) {
+        throw new NotFoundException('Payment not found');
+      }
+
+      return {
+        id: payment.id,
+        provider: payment.provider,
+        amount: Number(payment.amount),
+        currency: payment.currency,
+        status: payment.status,
+        transactionRef: payment.transactionRef,
+        paidAt: payment.paidAt,
+        expiresAt: payment.expiresAt,
+        createdAt: payment.createdAt,
+        booking: payment.booking
+          ? {
+              id: payment.booking.id,
+              bookingCode: payment.booking.bookingCode,
+              totalPrice: Number(payment.booking.totalPrice),
+              status: payment.booking.status,
+              account: payment.booking.account
+                ? {
+                    email: payment.booking.account.email,
+                    profile: payment.booking.account.profile
+                      ? {
+                          firstName: payment.booking.account.profile.firstName,
+                          lastName: payment.booking.account.profile.lastName,
+                          phone: payment.booking.account.profile.phone,
+                        }
+                      : null,
+                  }
+                : null,
+              showtime: payment.booking.showtime
+                ? {
+                    startTime: payment.booking.showtime.startTime,
+                    endTime: payment.booking.showtime.endTime,
+                    basePrice: Number(payment.booking.showtime.basePrice),
+                    movie: payment.booking.showtime.movie
+                      ? {
+                          id: payment.booking.showtime.movie.id,
+                          title: payment.booking.showtime.movie.title,
+                          language: payment.booking.showtime.movie.language,
+                        }
+                      : null,
+                    screen: payment.booking.showtime.screen
+                      ? {
+                          id: payment.booking.showtime.screen.id,
+                          name: payment.booking.showtime.screen.name,
+                          type: payment.booking.showtime.screen.type,
+                          theater: payment.booking.showtime.screen.theater
+                            ? {
+                                id: payment.booking.showtime.screen.theater.id,
+                                name: payment.booking.showtime.screen.theater.name,
+                              }
+                            : null,
+                        }
+                      : null,
+                  }
+                : null,
+              bookingSeats: payment.booking.bookingSeats?.map((bs) => ({
+                id: bs.id,
+                price: Number(bs.price),
+                seat: bs.seat
+                  ? {
+                      id: bs.seat.id,
+                      seatRow: bs.seat.seatRow,
+                      seatNumber: bs.seat.seatNumber,
+                      seatType: bs.seat.seatType,
+                    }
+                  : null,
+                ticket: bs.ticket
+                  ? {
+                      id: bs.ticket.id,
+                      qrCode: bs.ticket.qrCode,
+                      status: bs.ticket.status,
+                    }
+                  : null,
+              })),
+              foodItems: payment.booking.foodItems?.map((fi) => ({
+                id: fi.id,
+                quantity: fi.quantity,
+                unitPrice: Number(fi.unitPrice),
+                foodItem: fi.foodItem
+                  ? { id: fi.foodItem.id, name: fi.foodItem.name, price: Number(fi.foodItem.price) }
+                  : null,
+              })),
+            }
+          : null,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to fetch payment ${id}: ${error.message}`, error.stack);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to fetch payment');
+    }
+  }
+
+  async adminExportCsv(query: AdminPaymentExportDto) {
+    try {
+      const where: Prisma.PaymentWhereInput = {};
+
+      if (query.status) {
+        where.status = query.status as PaymentStatus;
+      }
+      if (query.provider) {
+        where.provider = query.provider;
+      }
+      if (query.from || query.to) {
+        where.createdAt = {};
+        if (query.from) where.createdAt.gte = new Date(query.from);
+        if (query.to) {
+          const toEnd = new Date(query.to);
+          toEnd.setHours(23, 59, 59, 999);
+          where.createdAt.lte = toEnd;
+        }
+      }
+
+      const payments = await this.prisma.payment.findMany({
+        where,
+        ...adminExportArgs,
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const headers = 'Payment ID,Provider,Amount,Currency,Status,Booking Code,User Email,User Name,Paid At,Created At\n';
+      const rows = payments.map((p: AdminExportPayment) => {
+        const name = [p.booking?.account?.profile?.firstName, p.booking?.account?.profile?.lastName].filter(Boolean).join(' ');
+        return `"${p.id}",${p.provider},${Number(p.amount)},${p.currency},${p.status},"${p.booking?.bookingCode || ''}","${p.booking?.account?.email || ''}","${name}",${p.paidAt?.toISOString() || ''},${p.createdAt.toISOString()}`;
+      }).join('\n');
+
+      return {
+        filename: `payments-export-${query.from || 'all'}-${query.to || 'now'}.csv`,
+        csv: headers + rows,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to export payments CSV: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Failed to export payments');
     }
   }
 }

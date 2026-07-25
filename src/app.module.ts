@@ -23,6 +23,8 @@ import { NotificationModule } from './notification/notification.module';
 import { FoodAndBeverageModule } from './food-and-beverage/food-and-beverage.module';
 import { RolesModule } from './roles/roles.module';
 import { SettingsModule } from './settings/settings.module';
+import { BookingsAdminModule } from './bookings-admin/bookings-admin.module';
+import { RefundsModule } from './refunds/refunds.module';
 import { PermissionsGuard } from './authentication/guards/permissions.guard';
 import { ScheduleModule } from '@nestjs/schedule';
 
@@ -53,6 +55,8 @@ import { ScheduleModule } from '@nestjs/schedule';
     FoodAndBeverageModule,
     RolesModule,
     SettingsModule,
+    BookingsAdminModule,
+    RefundsModule,
   ],
   controllers: [AppController],
   providers: [AppService, PermissionsGuard],
