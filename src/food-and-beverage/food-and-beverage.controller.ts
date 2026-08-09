@@ -124,10 +124,9 @@ export class FoodAndBeverageController {
 
   /* ─── Admin Endpoints ────────────────────────────── */
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
   @Permissions('canManageMovies')
-  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @Post('categories')
   @ApiOperation({ summary: 'Create a food category' })
@@ -144,10 +143,9 @@ export class FoodAndBeverageController {
     return this.fbService.getAllCategories();
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
   @Permissions('canManageMovies')
-  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @Patch('categories/:id')
   @ApiOperation({ summary: 'Update a food category' })
@@ -155,10 +153,9 @@ export class FoodAndBeverageController {
     return this.fbService.updateCategory(id, dto);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
   @Permissions('canManageMovies')
-  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @Patch('categories/:id/toggle-status')
   @ApiOperation({ summary: 'Toggle category active status' })
@@ -166,10 +163,9 @@ export class FoodAndBeverageController {
     return this.fbService.toggleCategoryStatus(id);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
   @Permissions('canManageMovies')
-  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @Delete('categories/:id')
   @ApiOperation({ summary: 'Delete a food category' })
@@ -177,10 +173,9 @@ export class FoodAndBeverageController {
     return this.fbService.deleteCategory(id);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
   @Permissions('canManageMovies')
-  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @Post('items')
   @ApiOperation({ summary: 'Create a food item' })
@@ -188,10 +183,9 @@ export class FoodAndBeverageController {
     return this.fbService.createItem(dto);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard,PermissionsGuard)
   @Roles('ADMIN')
   @Permissions('canManageMovies')
-  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @Post('items/bulk')
   @ApiOperation({
@@ -201,10 +195,9 @@ export class FoodAndBeverageController {
     return this.fbService.createBulkItems(dto);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
   @Permissions('canManageMovies')
-  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @Patch('items/:id')
   @ApiOperation({ summary: 'Update a food item' })
@@ -212,10 +205,9 @@ export class FoodAndBeverageController {
     return this.fbService.updateItem(id, dto);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
   @Permissions('canManageMovies')
-  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @Patch('items/:id/toggle-status')
   @ApiOperation({ summary: 'Toggle item active status' })
@@ -223,10 +215,9 @@ export class FoodAndBeverageController {
     return this.fbService.toggleItemStatus(id);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
   @Permissions('canManageMovies')
-  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @Delete('items/:id')
   @ApiOperation({ summary: 'Delete a food item' })

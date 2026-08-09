@@ -1,3 +1,4 @@
+
 import {
   Controller,
   Get,
@@ -29,11 +30,12 @@ import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
 import { Roles } from '../authentication/decorators/role.decorator';
 import { PermissionsGuard } from '../authentication/guards/permissions.guard';
 import { Permissions } from '../authentication/decorators/permissions.decorator';
-import { MovieQueryDto } from './dto/ movie-query.dto';
+
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../authentication/decorators/current-user.decorator';
 import { memoryStorage } from 'multer';
 import { UpdateMovieStatusDto } from './dto/update-status.dto';
+import {MovieQueryDto} from "./dto/ movie-query.dto";
 
 @ApiTags('Movies')
 @Controller('movies')
@@ -41,10 +43,9 @@ export class MoviesController {
   constructor(private readonly moviesService: MoviesService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
   @Permissions('canManageMovies')
-  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create movie with poster upload' })
   @UseInterceptors(
@@ -61,13 +62,15 @@ export class MoviesController {
   }
 
   @Patch(':id/status')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
   @Permissions('canManageMovies')
-  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Manually update movie status (Admin only)' })
-  updateStatus(@Param('id') id: string, @Body() dto: UpdateMovieStatusDto) {
+  updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateMovieStatusDto,
+  ) {
     return this.moviesService.updateStatus(id, dto.status);
   }
 
@@ -85,15 +88,17 @@ export class MoviesController {
   @ApiOperation({ summary: 'Get movie by ID' })
   @ApiResponse({ status: 200, description: 'Movie found' })
   @ApiResponse({ status: 404, description: 'Movie not found' })
-  findOne(@Param('id') id: string, @Query('date') date?: string) {
+  findOne(
+    @Param('id') id: string,
+    @Query('date') date?: string,
+  ) {
     return this.moviesService.findOne(id, date);
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
   @Permissions('canManageMovies')
-  @UseGuards(PermissionsGuard)
   @UseInterceptors(FileInterceptor('poster'))
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update movie (Admin only)' })
@@ -107,10 +112,9 @@ export class MoviesController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
   @Permissions('canManageMovies')
-  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete movie (Admin only)' })
   remove(@Param('id') id: string) {

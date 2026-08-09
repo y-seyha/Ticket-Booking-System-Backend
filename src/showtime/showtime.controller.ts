@@ -35,10 +35,9 @@ export class ShowtimeController {
   constructor(private readonly showtimeService: ShowtimeService) {}
 
   @Post('bulk')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
   @Permissions('canManageBookings')
-  @UseGuards(PermissionsGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Bulk generate showtime matrix (Admin only)' })
   @ApiResponse({
@@ -58,10 +57,9 @@ export class ShowtimeController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
   @Permissions('canManageBookings')
-  @UseGuards(PermissionsGuard)
   @ApiOperation({ summary: 'Create showtime' })
   @ApiResponse({ status: 201, description: 'Showtime created successfully' })
   create(@Body() dto: CreateShowtimeDto) {
@@ -104,10 +102,9 @@ export class ShowtimeController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
   @Permissions('canManageBookings')
-  @UseGuards(PermissionsGuard)
   @ApiOperation({ summary: 'Update showtime' })
   update(@Param('id') id: string, @Body() dto: UpdateShowtimeDto) {
     return this.showtimeService.update(id, dto);
@@ -127,10 +124,9 @@ export class ShowtimeController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
   @Permissions('canManageBookings')
-  @UseGuards(PermissionsGuard)
   @ApiOperation({ summary: 'Delete showtime' })
   remove(@Param('id') id: string) {
     return this.showtimeService.remove(id);
