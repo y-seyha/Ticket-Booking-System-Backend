@@ -11,9 +11,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateShowtimeDto } from './dto/create-showtime.dto';
 
 import { UpdateShowtimeDto } from './dto/update-showtime.dto';
-import { MovieStatus, ShowtimeStatus } from '@prisma/client';
+import { MovieStatus, Prisma, ShowtimeStatus } from '@prisma/client';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { CreateBulkScheduleDto } from './dto/create-bulk-showtime.dto';
+import { ShowtimeQueryDto } from './dto/showtime-query.dto';
 
 @Injectable()
 export class ShowtimeService {
@@ -241,15 +242,66 @@ export class ShowtimeService {
     }
   }
 
-  async findAll() {
+  async findAll(query: ShowtimeQueryDto) {
     try {
-      return await this.prisma.showtime.findMany({
-        include: {
-          movie: true,
-          screen: { include: { theater: true } },
+      const page = query.page ?? 1;
+      const limit = query.limit ?? 10;
+      const skip = (page - 1) * limit;
+
+      const where: Prisma.ShowtimeWhereInput = {};
+
+      if (query.movieId) {
+        where.movieId = query.movieId;
+      }
+      if (query.screenId) {
+        where.screenId = query.screenId;
+      }
+      if (query.theaterId) {
+        where.screen = { theaterId: query.theaterId };
+      }
+      if (query.status) {
+        where.status = query.status;
+      }
+      if (query.search?.trim()) {
+        const term = query.search.trim();
+        where.OR = [
+          { movie: { title: { contains: term, mode: 'insensitive' } } },
+          { screen: { name: { contains: term, mode: 'insensitive' } } },
+          {
+            screen: {
+              theater: { name: { contains: term, mode: 'insensitive' } },
+            },
+          },
+        ];
+      }
+      if (query.date) {
+        const { startOfDay, endOfDay } = this.parseDayRange(query.date);
+        where.startTime = { gte: startOfDay, lte: endOfDay };
+      }
+
+      const [data, total] = await this.prisma.$transaction([
+        this.prisma.showtime.findMany({
+          where,
+          include: {
+            movie: true,
+            screen: { include: { theater: true } },
+          },
+          orderBy: { startTime: 'asc' },
+          skip,
+          take: limit,
+        }),
+        this.prisma.showtime.count({ where }),
+      ]);
+
+      return {
+        data,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
         },
-        orderBy: { startTime: 'asc' },
-      });
+      };
     } catch (error) {
       this.logger.error('Failed to fetch showtimes', error?.stack);
       throw new InternalServerErrorException('Failed to fetch showtimes');
@@ -473,6 +525,53 @@ export class ShowtimeService {
     }
   }
 
+  private parseDayRange(dateStr: string): {
+    startOfDay: Date;
+    endOfDay: Date;
+  } {
+    let year: number;
+    let month: number;
+    let day: number;
+
+    // Explicitly check for the 'YYYY-MM-DD' format first to prevent Date.parse() hijacking
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      year = y;
+      month = m;
+      day = d;
+    }
+    //  Fallback to ISO/UTC parsing only if the format isn't simple YYYY-MM-DD
+    else if (dateStr.includes('T') || !isNaN(Date.parse(dateStr))) {
+      const utcDate = new Date(dateStr);
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Phnom_Penh',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+      });
+      const parts = formatter.formatToParts(utcDate);
+      year = Number(parts.find((p) => p.type === 'year')?.value);
+      month = Number(parts.find((p) => p.type === 'month')?.value);
+      day = Number(parts.find((p) => p.type === 'day')?.value);
+    } else {
+      throw new BadRequestException('Invalid date format provided');
+    }
+
+    if (isNaN(year) || isNaN(month) || isNaN(day)) {
+      throw new BadRequestException('Invalid date fields parsed');
+    }
+
+    //  Set precise boundaries using local hours adjustment
+    // Using UTC date and subtracting 7 hours ensures full day coverage (00:00:00 to 23:59:59 local)
+    const startOfDay = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+    startOfDay.setHours(startOfDay.getHours() - 7);
+
+    const endOfDay = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+    endOfDay.setHours(endOfDay.getHours() - 7);
+
+    return { startOfDay, endOfDay };
+  }
+
   async findActiveListings(status: MovieStatus, dateStr: string) {
     try {
       if (!status || !dateStr) {
@@ -481,47 +580,7 @@ export class ShowtimeService {
         );
       }
 
-      let year: number;
-      let month: number;
-      let day: number;
-
-      // Explicitly check for the 'YYYY-MM-DD' format first to prevent Date.parse() hijacking
-      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-        const [y, m, d] = dateStr.split('-').map(Number);
-        year = y;
-        month = m;
-        day = d;
-      }
-      //  Fallback to ISO/UTC parsing only if the format isn't simple YYYY-MM-DD
-      else if (dateStr.includes('T') || !isNaN(Date.parse(dateStr))) {
-        const utcDate = new Date(dateStr);
-        const formatter = new Intl.DateTimeFormat('en-US', {
-          timeZone: 'Asia/Phnom_Penh',
-          year: 'numeric',
-          month: 'numeric',
-          day: 'numeric',
-        });
-        const parts = formatter.formatToParts(utcDate);
-        year = Number(parts.find((p) => p.type === 'year')?.value);
-        month = Number(parts.find((p) => p.type === 'month')?.value);
-        day = Number(parts.find((p) => p.type === 'day')?.value);
-      } else {
-        throw new BadRequestException('Invalid date format provided');
-      }
-
-      if (isNaN(year) || isNaN(month) || isNaN(day)) {
-        throw new BadRequestException('Invalid date fields parsed');
-      }
-
-      //  Set precise boundaries using local hours adjustment
-      // Using UTC date and subtracting 7 hours ensures full day coverage (00:00:00 to 23:59:59 local)
-      const startOfDay = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
-      startOfDay.setHours(startOfDay.getHours() - 7);
-
-      const endOfDay = new Date(
-        Date.UTC(year, month - 1, day, 23, 59, 59, 999),
-      );
-      endOfDay.setHours(endOfDay.getHours() - 7);
+      const { startOfDay, endOfDay } = this.parseDayRange(dateStr);
 
       const isComingSoon = status === MovieStatus.COMING_SOON;
 

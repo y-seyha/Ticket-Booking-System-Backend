@@ -22,7 +22,6 @@ import { UpdateScreenTemplateDto } from './dto/update-screen-template.dto';
 import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
 import { Roles } from '../authentication/decorators/role.decorator';
 
-
 @Roles('ADMIN')
 @ApiTags('Screen Templates')
 @ApiBearerAuth()

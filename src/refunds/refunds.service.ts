@@ -1,7 +1,15 @@
-import { Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { TicketStatus, PaymentStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { AdminRefundsQueryDto, AdminRefundsExportDto } from './dto/refunds-query.dto';
+import {
+  AdminRefundsQueryDto,
+  AdminRefundsExportDto,
+} from './dto/refunds-query.dto';
 
 const refundInclude = {
   booking: {
@@ -70,8 +78,18 @@ export class RefundsService {
         const term = query.search;
         where.OR = [
           { booking: { bookingCode: { contains: term, mode: 'insensitive' } } },
-          { booking: { account: { email: { contains: term, mode: 'insensitive' } } } },
-          { booking: { showtime: { movie: { title: { contains: term, mode: 'insensitive' } } } } },
+          {
+            booking: {
+              account: { email: { contains: term, mode: 'insensitive' } },
+            },
+          },
+          {
+            booking: {
+              showtime: {
+                movie: { title: { contains: term, mode: 'insensitive' } },
+              },
+            },
+          },
         ];
       }
 
@@ -89,12 +107,18 @@ export class RefundsService {
         meta: { total },
       };
     } catch (error) {
-      this.logger.error(`Failed to fetch refunds: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to fetch refunds: ${error.message}`,
+        error.stack,
+      );
       throw new InternalServerErrorException('Failed to fetch refunds');
     }
   }
 
-  async afterRefund(ticket: { id: string; bookingSeatId: string }): Promise<RefundTicket | null> {
+  async afterRefund(ticket: {
+    id: string;
+    bookingSeatId: string;
+  }): Promise<RefundTicket | null> {
     try {
       const bookingSeat = await this.prisma.bookingSeat.findUnique({
         where: { id: ticket.bookingSeatId },
@@ -109,7 +133,9 @@ export class RefundsService {
       });
 
       if (!bookingSeat) {
-        this.logger.warn(`Booking seat ${ticket.bookingSeatId} not found for ticket ${ticket.id}`);
+        this.logger.warn(
+          `Booking seat ${ticket.bookingSeatId} not found for ticket ${ticket.id}`,
+        );
         return null;
       }
 
@@ -132,13 +158,18 @@ export class RefundsService {
       });
 
       if (!refundedTicket) {
-        this.logger.warn(`Ticket ${ticket.id} not found after refund processing`);
+        this.logger.warn(
+          `Ticket ${ticket.id} not found after refund processing`,
+        );
         return null;
       }
 
       return refundedTicket;
     } catch (error) {
-      this.logger.error(`Failed to process refund for ticket ${ticket.id}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to process refund for ticket ${ticket.id}: ${error.message}`,
+        error.stack,
+      );
       throw new InternalServerErrorException('Failed to process ticket refund');
     }
   }
@@ -165,21 +196,34 @@ export class RefundsService {
         orderBy: { updatedAt: 'desc' },
       });
 
-      const headers = 'Ticket ID,QR Code,Booking Code,User Email,User Name,Movie,Seat,Payment Status,Refunded At\n';
-      const rows = refunds.map((r) => {
-        const name = [r.booking.account.profile?.firstName, r.booking.account.profile?.lastName].filter(Boolean).join(' ');
-        const movie = r.booking.showtime?.movie?.title || 'N/A';
-        const seat = r.bookingSeat?.seat ? `${r.bookingSeat.seat.seatRow}${r.bookingSeat.seat.seatNumber}` : 'N/A';
-        const payStatus = r.booking.payment?.status || 'N/A';
-        return `"${r.id}","${r.qrCode}","${r.booking.bookingCode}","${r.booking.account.email}","${name}","${movie}","${seat}",${payStatus},${r.updatedAt.toISOString()}`;
-      }).join('\n');
+      const headers =
+        'Ticket ID,QR Code,Booking Code,User Email,User Name,Movie,Seat,Payment Status,Refunded At\n';
+      const rows = refunds
+        .map((r) => {
+          const name = [
+            r.booking.account.profile?.firstName,
+            r.booking.account.profile?.lastName,
+          ]
+            .filter(Boolean)
+            .join(' ');
+          const movie = r.booking.showtime?.movie?.title || 'N/A';
+          const seat = r.bookingSeat?.seat
+            ? `${r.bookingSeat.seat.seatRow}${r.bookingSeat.seat.seatNumber}`
+            : 'N/A';
+          const payStatus = r.booking.payment?.status || 'N/A';
+          return `"${r.id}","${r.qrCode}","${r.booking.bookingCode}","${r.booking.account.email}","${name}","${movie}","${seat}",${payStatus},${r.updatedAt.toISOString()}`;
+        })
+        .join('\n');
 
       return {
         filename: `refunds-export-${query.from || 'all'}-${query.to || 'now'}.csv`,
         csv: headers + rows,
       };
     } catch (error) {
-      this.logger.error(`Failed to export refunds CSV: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to export refunds CSV: ${error.message}`,
+        error.stack,
+      );
       throw new InternalServerErrorException('Failed to export refunds');
     }
   }

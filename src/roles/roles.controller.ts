@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
@@ -54,7 +63,9 @@ export class RolesController {
   @Roles('ADMIN')
   @Permissions('canManageUsers')
   @UseGuards(RolesGuard, PermissionsGuard)
-  @ApiOperation({ summary: 'Delete a role (cannot delete system roles or roles with users)' })
+  @ApiOperation({
+    summary: 'Delete a role (cannot delete system roles or roles with users)',
+  })
   remove(@Param('id') id: string) {
     return this.rolesService.remove(id);
   }

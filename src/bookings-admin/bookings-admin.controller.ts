@@ -8,11 +8,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { Roles } from '../authentication/decorators/role.decorator';
 import { RolesGuard } from '../authentication/guards/roles.guard';
@@ -41,7 +37,10 @@ export class BookingsAdminController {
   async export(@Query() query: AdminBookingExportDto, @Res() res: Response) {
     const result = await this.bookingsAdminService.exportCsv(query);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${result.filename}"`,
+    );
     res.send(result.csv);
   }
 

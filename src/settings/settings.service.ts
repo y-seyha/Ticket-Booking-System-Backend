@@ -36,7 +36,9 @@ export class SettingsService {
     const results: Record<string, any> = {};
 
     for (const [key, value] of Object.entries(dto.settings)) {
-      const existing = await this.prisma.systemSetting.findUnique({ where: { key } });
+      const existing = await this.prisma.systemSetting.findUnique({
+        where: { key },
+      });
       if (existing) {
         results[key] = await this.prisma.systemSetting.update({
           where: { key },

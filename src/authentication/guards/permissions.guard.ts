@@ -11,14 +11,16 @@ export class PermissionsGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(
+      PERMISSIONS_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     if (!requiredPermissions || requiredPermissions.length === 0) return true;
 
-    const request = context.switchToHttp().getRequest<{ user?: { id?: string; sub?: string; role?: string } }>();
+    const request = context
+      .switchToHttp()
+      .getRequest<{ user?: { id?: string; sub?: string; role?: string } }>();
     const user = request.user;
     if (!user || !user.role) return false;
 
@@ -30,6 +32,6 @@ export class PermissionsGuard implements CanActivate {
 
     const permissions = role.permissions as Record<string, boolean>;
 
-    return requiredPermissions.every(perm => permissions[perm] === true);
+    return requiredPermissions.every((perm) => permissions[perm] === true);
   }
 }

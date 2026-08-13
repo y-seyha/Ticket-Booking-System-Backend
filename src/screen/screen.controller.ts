@@ -18,7 +18,6 @@ import { UpdateScreenDto } from './dto/update-screen.dto';
 import { JwtAuthGuard } from '../authentication/guards/jwt-auth.guard';
 import { Roles } from '../authentication/decorators/role.decorator';
 
-
 @ApiTags('Screens')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)

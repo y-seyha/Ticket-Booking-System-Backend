@@ -27,6 +27,7 @@ import { Roles } from '../authentication/decorators/role.decorator';
 import { PermissionsGuard } from '../authentication/guards/permissions.guard';
 import { Permissions } from '../authentication/decorators/permissions.decorator';
 import { CreateBulkScheduleDto } from './dto/create-bulk-showtime.dto';
+import { ShowtimeQueryDto } from './dto/showtime-query.dto';
 
 @ApiTags('Showtimes')
 @ApiBearerAuth()
@@ -67,9 +68,9 @@ export class ShowtimeController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all showtimes' })
-  findAll() {
-    return this.showtimeService.findAll();
+  @ApiOperation({ summary: 'Get all showtimes with filters and pagination' })
+  findAll(@Query() query: ShowtimeQueryDto) {
+    return this.showtimeService.findAll(query);
   }
 
   @Get('movie/:movieId')

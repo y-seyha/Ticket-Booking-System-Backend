@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
@@ -18,7 +24,7 @@ export class RolesService {
       },
     });
 
-    return roles.map(role => ({
+    return roles.map((role) => ({
       id: role.id,
       name: role.name,
       description: role.description,
@@ -56,8 +62,11 @@ export class RolesService {
   async create(dto: CreateRoleDto) {
     this.logger.log(`Creating role: ${dto.id}`);
 
-    const existing = await this.prisma.role.findUnique({ where: { id: dto.id } });
-    if (existing) throw new ConflictException('Role with this ID already exists');
+    const existing = await this.prisma.role.findUnique({
+      where: { id: dto.id },
+    });
+    if (existing)
+      throw new ConflictException('Role with this ID already exists');
 
     const role = await this.prisma.role.create({
       data: {
@@ -78,8 +87,11 @@ export class RolesService {
     if (!role) throw new NotFoundException('Role not found');
 
     if (dto.id && dto.id !== id) {
-      const existing = await this.prisma.role.findUnique({ where: { id: dto.id } });
-      if (existing) throw new ConflictException('Role with this ID already exists');
+      const existing = await this.prisma.role.findUnique({
+        where: { id: dto.id },
+      });
+      if (existing)
+        throw new ConflictException('Role with this ID already exists');
     }
 
     const updated = await this.prisma.role.update({
@@ -104,8 +116,12 @@ export class RolesService {
     });
 
     if (!role) throw new NotFoundException('Role not found');
-    if (role.isSystem) throw new BadRequestException('Cannot delete a system role');
-    if (role._count.accounts > 0) throw new BadRequestException(`Cannot delete role with ${role._count.accounts} assigned users`);
+    if (role.isSystem)
+      throw new BadRequestException('Cannot delete a system role');
+    if (role._count.accounts > 0)
+      throw new BadRequestException(
+        `Cannot delete role with ${role._count.accounts} assigned users`,
+      );
 
     await this.prisma.role.delete({ where: { id } });
 

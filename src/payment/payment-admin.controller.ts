@@ -1,18 +1,14 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Query,
-  UseGuards,
-  Res,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards, Res } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { Roles } from '../authentication/decorators/role.decorator';
 import { RolesGuard } from '../authentication/guards/roles.guard';
 import { PaymentService } from './payment.service';
-import { AdminPaymentsQueryDto, AdminPaymentExportDto } from './dto/admin-payments-query.dto';
+import {
+  AdminPaymentsQueryDto,
+  AdminPaymentExportDto,
+} from './dto/admin-payments-query.dto';
 
 @ApiTags('Payments Admin')
 @Controller('payments/admin')
@@ -33,7 +29,10 @@ export class PaymentAdminController {
   async export(@Query() query: AdminPaymentExportDto, @Res() res: Response) {
     const result = await this.paymentService.adminExportCsv(query);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${result.filename}"`,
+    );
     res.send(result.csv);
   }
 

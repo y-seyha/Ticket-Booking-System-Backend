@@ -5,7 +5,12 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { BookingStatus, PaymentProvider, PaymentStatus, Prisma } from '@prisma/client';
+import {
+  BookingStatus,
+  PaymentProvider,
+  PaymentStatus,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   PayDto,
@@ -15,7 +20,10 @@ import {
 import { SeatGateway } from '../seat/seat.gateway';
 import { TicketService } from '../ticket/ticket.service';
 import { NotificationService } from '../notification/notification.service';
-import { AdminPaymentsQueryDto, AdminPaymentExportDto } from './dto/admin-payments-query.dto';
+import {
+  AdminPaymentsQueryDto,
+  AdminPaymentExportDto,
+} from './dto/admin-payments-query.dto';
 
 const adminFindAllInclude = {
   booking: {
@@ -357,7 +365,10 @@ export class PaymentService {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to fetch payments: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to fetch payments: ${error.message}`,
+        error.stack,
+      );
       throw new InternalServerErrorException('Failed to fetch payments');
     }
   }
@@ -367,7 +378,7 @@ export class PaymentService {
       const payment = await this.prisma.payment.findUnique({
         where: { id },
         ...adminFindOneArgs,
-      }) as AdminFindOnePayment | null;
+      });
 
       if (!payment) {
         throw new NotFoundException('Payment not found');
@@ -421,7 +432,8 @@ export class PaymentService {
                           theater: payment.booking.showtime.screen.theater
                             ? {
                                 id: payment.booking.showtime.screen.theater.id,
-                                name: payment.booking.showtime.screen.theater.name,
+                                name: payment.booking.showtime.screen.theater
+                                  .name,
                               }
                             : null,
                         }
@@ -452,14 +464,21 @@ export class PaymentService {
                 quantity: fi.quantity,
                 unitPrice: Number(fi.unitPrice),
                 foodItem: fi.foodItem
-                  ? { id: fi.foodItem.id, name: fi.foodItem.name, price: Number(fi.foodItem.price) }
+                  ? {
+                      id: fi.foodItem.id,
+                      name: fi.foodItem.name,
+                      price: Number(fi.foodItem.price),
+                    }
                   : null,
               })),
             }
           : null,
       };
     } catch (error) {
-      this.logger.error(`Failed to fetch payment ${id}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to fetch payment ${id}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof NotFoundException) {
         throw error;
       }
@@ -493,18 +512,29 @@ export class PaymentService {
         orderBy: { createdAt: 'desc' },
       });
 
-      const headers = 'Payment ID,Provider,Amount,Currency,Status,Booking Code,User Email,User Name,Paid At,Created At\n';
-      const rows = payments.map((p: AdminExportPayment) => {
-        const name = [p.booking?.account?.profile?.firstName, p.booking?.account?.profile?.lastName].filter(Boolean).join(' ');
-        return `"${p.id}",${p.provider},${Number(p.amount)},${p.currency},${p.status},"${p.booking?.bookingCode || ''}","${p.booking?.account?.email || ''}","${name}",${p.paidAt?.toISOString() || ''},${p.createdAt.toISOString()}`;
-      }).join('\n');
+      const headers =
+        'Payment ID,Provider,Amount,Currency,Status,Booking Code,User Email,User Name,Paid At,Created At\n';
+      const rows = payments
+        .map((p: AdminExportPayment) => {
+          const name = [
+            p.booking?.account?.profile?.firstName,
+            p.booking?.account?.profile?.lastName,
+          ]
+            .filter(Boolean)
+            .join(' ');
+          return `"${p.id}",${p.provider},${Number(p.amount)},${p.currency},${p.status},"${p.booking?.bookingCode || ''}","${p.booking?.account?.email || ''}","${name}",${p.paidAt?.toISOString() || ''},${p.createdAt.toISOString()}`;
+        })
+        .join('\n');
 
       return {
         filename: `payments-export-${query.from || 'all'}-${query.to || 'now'}.csv`,
         csv: headers + rows,
       };
     } catch (error) {
-      this.logger.error(`Failed to export payments CSV: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to export payments CSV: ${error.message}`,
+        error.stack,
+      );
       throw new InternalServerErrorException('Failed to export payments');
     }
   }

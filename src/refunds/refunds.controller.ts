@@ -14,7 +14,10 @@ import type { Response } from 'express';
 import { Roles } from '../authentication/decorators/role.decorator';
 import { RolesGuard } from '../authentication/guards/roles.guard';
 import { RefundsService } from './refunds.service';
-import { AdminRefundsQueryDto, AdminRefundsExportDto } from './dto/refunds-query.dto';
+import {
+  AdminRefundsQueryDto,
+  AdminRefundsExportDto,
+} from './dto/refunds-query.dto';
 import { TicketService } from '../ticket/ticket.service';
 
 @ApiTags('Refunds Admin')
@@ -41,7 +44,10 @@ export class RefundsController {
   async export(@Query() query: AdminRefundsExportDto, @Res() res: Response) {
     const result = await this.refundsService.exportCsv(query);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${result.filename}"`,
+    );
     res.send(result.csv);
   }
 

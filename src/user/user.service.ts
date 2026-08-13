@@ -34,12 +34,14 @@ export class UserService {
   }
 
   private transformAccounts(accounts: any[]) {
-    return accounts.map(a => this.transformAccount(a));
+    return accounts.map((a) => this.transformAccount(a));
   }
 
   async getMyProfile(
     accountId: string,
-  ): Promise<Account & { profile: (UserProfile & { avatar: File | null }) | null }> {
+  ): Promise<
+    Account & { profile: (UserProfile & { avatar: File | null }) | null }
+  > {
     try {
       this.logger.log(`Fetching profile for accountId=${accountId}`);
 

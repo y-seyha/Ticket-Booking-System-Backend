@@ -183,7 +183,7 @@ export class FoodAndBeverageController {
     return this.fbService.createItem(dto);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard,PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
   @Permissions('canManageMovies')
   @ApiBearerAuth()

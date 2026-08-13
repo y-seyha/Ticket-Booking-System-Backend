@@ -5,11 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  BookingStatus,
-  PaymentStatus,
-  Prisma,
-} from '@prisma/client';
+import { BookingStatus, PaymentStatus, Prisma } from '@prisma/client';
 import type { Booking, Payment } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SeatGateway } from '../seat/seat.gateway';
@@ -42,13 +38,25 @@ const bookingInclude = {
   tickets: true,
 } satisfies Prisma.BookingInclude;
 
-type BookingWithRelations = Prisma.BookingGetPayload<{ include: typeof bookingInclude }>;
+type BookingWithRelations = Prisma.BookingGetPayload<{
+  include: typeof bookingInclude;
+}>;
 
 interface BookingSeatWithRelations {
   id: string;
   price: number | Prisma.Decimal;
-  seat: { id: string; seatRow: string; seatNumber: number; seatType: string } | null;
-  ticket: { id: string; qrCode: string; status: string; validatedAt: Date | null } | null;
+  seat: {
+    id: string;
+    seatRow: string;
+    seatNumber: number;
+    seatType: string;
+  } | null;
+  ticket: {
+    id: string;
+    qrCode: string;
+    status: string;
+    validatedAt: Date | null;
+  } | null;
 }
 
 interface FoodItemWithRelations {
@@ -68,7 +76,12 @@ interface TicketInfo {
 export interface AccountInfo {
   id: string;
   email: string;
-  profile: { firstName: string | null; lastName: string | null; phone: string | null; avatarId: string | null } | null;
+  profile: {
+    firstName: string | null;
+    lastName: string | null;
+    phone: string | null;
+    avatarId: string | null;
+  } | null;
 }
 
 interface ShowtimeInfo {
@@ -76,8 +89,18 @@ interface ShowtimeInfo {
   startTime: Date;
   endTime: Date;
   basePrice: number | Prisma.Decimal;
-  movie: { id: string; title: string; language: string; posterId: string | null } | null;
-  screen: { id: string; name: string; type: string; theater: { id: string; name: string } | null } | null;
+  movie: {
+    id: string;
+    title: string;
+    language: string;
+    posterId: string | null;
+  } | null;
+  screen: {
+    id: string;
+    name: string;
+    type: string;
+    theater: { id: string; name: string } | null;
+  } | null;
 }
 
 interface PaymentInfo {
@@ -126,7 +149,9 @@ export class BookingsAdminService {
     private readonly seatGateway: SeatGateway,
   ) {}
 
-  async findAll(query: AdminBookingsQueryDto): Promise<PaginatedResponse<TransformedBooking>> {
+  async findAll(
+    query: AdminBookingsQueryDto,
+  ): Promise<PaginatedResponse<TransformedBooking>> {
     try {
       const where = this.buildWhere(query);
       const orderBy = this.buildOrderBy(query);
@@ -134,33 +159,52 @@ export class BookingsAdminService {
       const limit = query.limit || 20;
       const skip = (page - 1) * limit;
 
-      this.logger.log(`findAll: page=${page} limit=${limit} skip=${skip} status=${query.status} from=${query.from} to=${query.to}`);
+      this.logger.log(
+        `findAll: page=${page} limit=${limit} skip=${skip} status=${query.status} from=${query.from} to=${query.to}`,
+      );
 
       const [data, total] = await Promise.all([
-        this.prisma.booking.findMany({ where, include: bookingInclude, orderBy, skip, take: limit }),
+        this.prisma.booking.findMany({
+          where,
+          include: bookingInclude,
+          orderBy,
+          skip,
+          take: limit,
+        }),
         this.prisma.booking.count({ where }),
       ]);
 
-      this.logger.log(`findAll result: ${data.length} bookings, ${total} total`);
+      this.logger.log(
+        `findAll result: ${data.length} bookings, ${total} total`,
+      );
 
       return {
         data: data.map((b) => this.transformBooking(b)),
         meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
       };
     } catch (error) {
-      this.logger.error('findAll failed', error instanceof Error ? error.stack : error);
+      this.logger.error(
+        'findAll failed',
+        error instanceof Error ? error.stack : error,
+      );
       throw new InternalServerErrorException('Failed to fetch bookings');
     }
   }
 
   async findOne(id: string): Promise<TransformedBooking> {
     try {
-      const booking = await this.prisma.booking.findUnique({ where: { id }, include: bookingInclude });
+      const booking = await this.prisma.booking.findUnique({
+        where: { id },
+        include: bookingInclude,
+      });
       if (!booking) throw new NotFoundException('Booking not found');
       return this.transformBooking(booking);
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
-      this.logger.error(`findOne(${id}) failed`, error instanceof Error ? error.stack : error);
+      this.logger.error(
+        `findOne(${id}) failed`,
+        error instanceof Error ? error.stack : error,
+      );
       throw new InternalServerErrorException('Failed to fetch booking');
     }
   }
@@ -173,8 +217,10 @@ export class BookingsAdminService {
       });
 
       if (!booking) throw new NotFoundException('Booking not found');
-      if (booking.status === BookingStatus.CANCELLED) throw new BadRequestException('Booking is already cancelled');
-      if (booking.status === BookingStatus.CONFIRMED) throw new BadRequestException('Cannot cancel a confirmed booking');
+      if (booking.status === BookingStatus.CANCELLED)
+        throw new BadRequestException('Booking is already cancelled');
+      if (booking.status === BookingStatus.CONFIRMED)
+        throw new BadRequestException('Cannot cancel a confirmed booking');
 
       await this.prisma.$transaction(async (tx) => {
         await tx.booking.update({
@@ -198,8 +244,15 @@ export class BookingsAdminService {
       this.logger.log(`Booking ${booking.bookingCode} cancelled by admin`);
       return this.findOne(id);
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) throw error;
-      this.logger.error(`cancel(${id}) failed`, error instanceof Error ? error.stack : error);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      )
+        throw error;
+      this.logger.error(
+        `cancel(${id}) failed`,
+        error instanceof Error ? error.stack : error,
+      );
       throw new InternalServerErrorException('Failed to cancel booking');
     }
   }
@@ -229,18 +282,29 @@ export class BookingsAdminService {
         orderBy: { createdAt: 'desc' },
       });
 
-      const headers = 'Booking Code,Status,User Email,User Name,Movie,Showtime,Seats,Total Amount,Payment Status,Payment Provider,Created At\n';
-      const rows = bookings.map((b) => {
-        const name = [b.account?.profile?.firstName, b.account?.profile?.lastName].filter(Boolean).join(' ');
-        return `"${b.bookingCode}",${b.status},"${b.account?.email || ''}","${name}","${b.showtime?.movie?.title || 'N/A'}",${b.showtime?.startTime ? new Date(b.showtime.startTime).toISOString() : 'N/A'},${b.bookingSeats.length},${b.totalPrice},${b.payment?.status || 'N/A'},${b.payment?.provider || 'N/A'},${b.createdAt.toISOString()}`;
-      }).join('\n');
+      const headers =
+        'Booking Code,Status,User Email,User Name,Movie,Showtime,Seats,Total Amount,Payment Status,Payment Provider,Created At\n';
+      const rows = bookings
+        .map((b) => {
+          const name = [
+            b.account?.profile?.firstName,
+            b.account?.profile?.lastName,
+          ]
+            .filter(Boolean)
+            .join(' ');
+          return `"${b.bookingCode}",${b.status},"${b.account?.email || ''}","${name}","${b.showtime?.movie?.title || 'N/A'}",${b.showtime?.startTime ? new Date(b.showtime.startTime).toISOString() : 'N/A'},${b.bookingSeats.length},${b.totalPrice},${b.payment?.status || 'N/A'},${b.payment?.provider || 'N/A'},${b.createdAt.toISOString()}`;
+        })
+        .join('\n');
 
       return {
         filename: `bookings-export-${query.from || 'all'}-${query.to || 'now'}.csv`,
         csv: headers + rows,
       };
     } catch (error) {
-      this.logger.error('exportCsv failed', error instanceof Error ? error.stack : error);
+      this.logger.error(
+        'exportCsv failed',
+        error instanceof Error ? error.stack : error,
+      );
       throw new InternalServerErrorException('Failed to export bookings');
     }
   }
@@ -262,19 +326,35 @@ export class BookingsAdminService {
       where.OR = [
         { bookingCode: { contains: term, mode: 'insensitive' } },
         { account: { email: { contains: term, mode: 'insensitive' } } },
-        { account: { profile: { firstName: { contains: term, mode: 'insensitive' } } } },
-        { account: { profile: { lastName: { contains: term, mode: 'insensitive' } } } },
-        { showtime: { movie: { title: { contains: term, mode: 'insensitive' } } } },
+        {
+          account: {
+            profile: { firstName: { contains: term, mode: 'insensitive' } },
+          },
+        },
+        {
+          account: {
+            profile: { lastName: { contains: term, mode: 'insensitive' } },
+          },
+        },
+        {
+          showtime: {
+            movie: { title: { contains: term, mode: 'insensitive' } },
+          },
+        },
       ];
     }
     return where;
   }
 
-  private buildOrderBy(query: AdminBookingsQueryDto): Prisma.BookingOrderByWithRelationInput {
+  private buildOrderBy(
+    query: AdminBookingsQueryDto,
+  ): Prisma.BookingOrderByWithRelationInput {
     const orderBy: Prisma.BookingOrderByWithRelationInput = {};
     const sortField = query.sortBy || BookingsSortField.CREATED_AT;
     const sortOrder = query.sortOrder || SortOrder.DESC;
-    orderBy[sortField === BookingsSortField.BOOKING_CODE ? 'bookingCode' : sortField] = sortOrder;
+    orderBy[
+      sortField === BookingsSortField.BOOKING_CODE ? 'bookingCode' : sortField
+    ] = sortOrder;
     return orderBy;
   }
 
