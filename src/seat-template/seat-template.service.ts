@@ -7,6 +7,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { Prisma } from '@prisma/client';
 import { GenerateTemplateSeatsDto } from './dto/generate-template-seat.dto';
 import { UpdateTemplateLayoutDto } from './dto/update-template.dto';
@@ -15,8 +16,12 @@ import { UpdateTemplateLayoutDto } from './dto/update-template.dto';
 @Injectable()
 export class SeatTemplateService {
   private readonly logger = new Logger(SeatTemplateService.name);
+  private readonly ttlSeconds = 300;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
+  ) {}
 
   private handleError(
     error: unknown,
@@ -40,63 +45,69 @@ export class SeatTemplateService {
 
   async findAll() {
     try {
-      const seats = await this.prisma.screenTemplateSeat.findMany({
-        include: {
-          layout: {
+      return await this.redisService.getOrSet(
+        'seat-template:list',
+        this.ttlSeconds,
+        async () => {
+          const seats = await this.prisma.screenTemplateSeat.findMany({
             include: {
-              template: true,
+              layout: {
+                include: {
+                  template: true,
+                },
+              },
             },
-          },
-        },
-        orderBy: [{ layoutId: 'asc' }, { posY: 'asc' }, { posX: 'asc' }],
-      });
-
-      const normalizedMap = seats.reduce(
-        (acc, currentSeat) => {
-          const layout = currentSeat.layout;
-          const template = layout?.template;
-
-          if (!template || !layout) return acc;
-
-          if (!acc[template.id]) {
-            acc[template.id] = {
-              templateId: template.id,
-              templateName: template.name,
-              screenType: template.type,
-              screenSurcharge: template.screenSurcharge,
-              isActive: template.isActive,
-              layouts: {},
-            };
-          }
-
-          if (!acc[template.id].layouts[layout.id]) {
-            acc[template.id].layouts[layout.id] = {
-              layoutId: layout.id,
-              layoutName: layout.name,
-              createdAt: layout.createdAt,
-              updatedAt : layout.updatedAt,
-              seats: [],
-            };
-          }
-
-          acc[template.id].layouts[layout.id].seats.push({
-            id: currentSeat.id,
-            seatRow: currentSeat.seatRow,
-            seatNumber: currentSeat.seatNumber,
-            posX: currentSeat.posX,
-            posY: currentSeat.posY,
-            seatType: currentSeat.seatType,
+            orderBy: [{ layoutId: 'asc' }, { posY: 'asc' }, { posX: 'asc' }],
           });
 
-          return acc;
-        },
-        {} as Record<string, any>,
-      );
+          const normalizedMap = seats.reduce(
+            (acc, currentSeat) => {
+              const layout = currentSeat.layout;
+              const template = layout?.template;
 
-      return Object.values(normalizedMap).map((templateNode: any) => ({
-        ...templateNode,
-        layouts: Object.values(templateNode.layouts),
-      }));
+              if (!template || !layout) return acc;
+
+              if (!acc[template.id]) {
+                acc[template.id] = {
+                  templateId: template.id,
+                  templateName: template.name,
+                  screenType: template.type,
+                  screenSurcharge: template.screenSurcharge,
+                  isActive: template.isActive,
+                  layouts: {},
+                };
+              }
+
+              if (!acc[template.id].layouts[layout.id]) {
+                acc[template.id].layouts[layout.id] = {
+                  layoutId: layout.id,
+                  layoutName: layout.name,
+                  createdAt: layout.createdAt,
+                  updatedAt : layout.updatedAt,
+                  seats: [],
+                };
+              }
+
+              acc[template.id].layouts[layout.id].seats.push({
+                id: currentSeat.id,
+                seatRow: currentSeat.seatRow,
+                seatNumber: currentSeat.seatNumber,
+                posX: currentSeat.posX,
+                posY: currentSeat.posY,
+                seatType: currentSeat.seatType,
+              });
+
+              return acc;
+            },
+            {} as Record<string, any>,
+          );
+
+          return Object.values(normalizedMap).map((templateNode: any) => ({
+            ...templateNode,
+            layouts: Object.values(templateNode.layouts),
+          }));
+        },
+      );
     } catch (error) {
       this.handleError(
         error,
@@ -108,22 +119,28 @@ export class SeatTemplateService {
 
   async findOne(id: string) {
     try {
-      const seat = await this.prisma.screenTemplateSeat.findUnique({
-        where: { id },
-        include: {
-          layout: {
+      return await this.redisService.getOrSet(
+        `seat-template:one:${id}`,
+        this.ttlSeconds,
+        async () => {
+          const seat = await this.prisma.screenTemplateSeat.findUnique({
+            where: { id },
             include: {
-              template: true,
+              layout: {
+                include: {
+                  template: true,
+                },
+              },
             },
-          },
+          });
+
+          if (!seat) {
+            throw new NotFoundException('Template seat not found');
+          }
+
+          return seat;
         },
-      });
-
-      if (!seat) {
-        throw new NotFoundException('Template seat not found');
-      }
-
-      return seat;
+      );
     } catch (error) {
       this.handleError(
         error,
@@ -135,22 +152,28 @@ export class SeatTemplateService {
 
   async findByTemplate(templateId: string) {
     try {
-      const template = await this.prisma.screenTemplate.findUnique({
-        where: { id: templateId },
-      });
+      return await this.redisService.getOrSet(
+        `seat-template:byTemplate:${templateId}`,
+        this.ttlSeconds,
+        async () => {
+          const template = await this.prisma.screenTemplate.findUnique({
+            where: { id: templateId },
+          });
 
-      if (!template) {
-        throw new NotFoundException('Screen template not found');
-      }
+          if (!template) {
+            throw new NotFoundException('Screen template not found');
+          }
 
-      return await this.prisma.screenTemplateSeat.findMany({
-        where: {
-          layout: {
-            templateId: templateId,
-          },
+          return this.prisma.screenTemplateSeat.findMany({
+            where: {
+              layout: {
+                templateId: templateId,
+              },
+            },
+            orderBy: [{ posY: 'asc' }, { posX: 'asc' }],
+          });
         },
-        orderBy: [{ posY: 'asc' }, { posX: 'asc' }],
-      });
+      );
     } catch (error) {
       this.handleError(
         error,
@@ -212,6 +235,8 @@ export class SeatTemplateService {
       const result = await this.prisma.screenTemplateSeat.createMany({
         data: seatsData,
       });
+
+      await this.invalidateAll();
 
       return {
         message: 'Successfully generated a new seat template layout variant',
@@ -300,6 +325,9 @@ export class SeatTemplateService {
           layoutName: updatedLayout.name,
           seatsUpdated: !!dto.seatMap,
         };
+      }).then(async (result) => {
+        await this.invalidateAll();
+        return result;
       });
     } catch (error) {
       if (
@@ -332,6 +360,8 @@ export class SeatTemplateService {
         where: { id: layoutId },
       });
 
+      await this.invalidateAll();
+
       return {
         message:
           'Successfully removed layout option and all associated template seats',
@@ -355,5 +385,9 @@ export class SeatTemplateService {
       y = y * 26 + (cleanRow.charCodeAt(i) - 64);
     }
     return y;
+  }
+
+  private async invalidateAll() {
+    await this.redisService.delPattern('seat-template:*');
   }
 }

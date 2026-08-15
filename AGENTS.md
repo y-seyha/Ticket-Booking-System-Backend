@@ -32,7 +32,16 @@ Order: `lint` before committing; no typecheck script exists (`tsc` via `nest bui
 - **Global ValidationPipe**: whitelist + transform + forbidNonWhitelisted
 
 ## Modules
-`src/` modules mirror DB entities: `authentication`, `movies`, `theater`, `screen`, `screen-template`, `seat-template`, `seat`, `seat-pricing`, `showtime`, `checkout`, `payment`, `file-upload`, `user`, `prisma`, `provider` (OAuth).
+`src/` modules mirror DB entities: `authentication`, `movies`, `theater`, `screen`, `screen-template`, `seat-template`, `seat`, `seat-pricing`, `showtime`, `checkout`, `payment`, `file-upload`, `user`, `prisma`, `provider` (OAuth), `redis`.
+
+## Redis caching
+- **Client**: `ioredis` via global `RedisModule` (`src/redis/`) — inject `RedisService` anywhere; no module import needed.
+- **Config**: `REDIS_URL` env (defaults to `redis://localhost:6379`).
+- **Fail-open**: Redis errors are logged and reads fall through to Prisma — cache is never a hard dependency.
+- **API**: `getOrSet(key, ttlSeconds, loader)` (cache-aside + in-flight stampede de-dup), `getJson`, `setJson`, `del`, `delPattern(pattern)`.
+- **Cached reads** (TTL 60–300s): settings, seat-pricing, screen-template, seat-template, movies list/detail, search/autocomplete, food & beverage public menu.
+- **Invalidation**: every write in these services calls `del`/`delPattern` (e.g. `movies:*`, `seat-pricing:*`, `search:*`, `f&b:*`). Keep keys namespaced with the entity prefix.
+- **Never cache** per-user or time-sensitive data (checkout prep, seat locks/maps, tickets, profiles).
 
 ## Pricing model
 `total = showtime.basePrice + screenTemplate.screenSurcharge + seatPricingRule.seatSurcharge`

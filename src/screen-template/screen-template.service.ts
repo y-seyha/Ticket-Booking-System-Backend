@@ -6,20 +6,25 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { CreateScreenTemplateDto } from './dto/create-screen-template.dto';
 import { UpdateScreenTemplateDto } from './dto/update-screen-template.dto';
 
 @Injectable()
 export class ScreenTemplateService {
   private readonly logger = new Logger(ScreenTemplateService.name);
+  private readonly ttlSeconds = 300;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
+  ) {}
 
   async create(dto: CreateScreenTemplateDto) {
     try {
       this.logger.log(`Creating screen template: ${dto.name}`);
 
-      return await this.prisma.screenTemplate.create({
+      const created = await this.prisma.screenTemplate.create({
         data: {
           name: dto.name,
           type: dto.type,
@@ -27,6 +32,10 @@ export class ScreenTemplateService {
           screenSurcharge: dto.screenSurcharge,
         },
       });
+
+      await this.invalidateAll();
+
+      return created;
     } catch (error: unknown) {
       const err = error as any;
 
@@ -41,16 +50,22 @@ export class ScreenTemplateService {
 
   async findAll() {
     try {
-      const templates = await this.prisma.screenTemplate.findMany({
-        include: {
-          templateSeats: true,
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      });
+      return await this.redisService.getOrSet(
+        'screen-template:list',
+        this.ttlSeconds,
+        async () => {
+          const templates = await this.prisma.screenTemplate.findMany({
+            include: {
+              templateSeats: true,
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+          });
 
-      return templates.map((tmpl) => this.normalizeTemplate(tmpl));
+          return templates.map((tmpl) => this.normalizeTemplate(tmpl));
+        },
+      );
     } catch (error) {
       this.logger.error('Fetch templates failed', error.stack);
       throw new InternalServerErrorException();
@@ -59,18 +74,24 @@ export class ScreenTemplateService {
 
   async findOne(id: string) {
     try {
-      const template = await this.prisma.screenTemplate.findUnique({
-        where: { id },
-        include: {
-          templateSeats: true,
+      return await this.redisService.getOrSet(
+        `screen-template:one:${id}`,
+        this.ttlSeconds,
+        async () => {
+          const template = await this.prisma.screenTemplate.findUnique({
+            where: { id },
+            include: {
+              templateSeats: true,
+            },
+          });
+
+          if (!template) {
+            throw new NotFoundException('Screen template not found');
+          }
+
+          return this.normalizeTemplate(template);
         },
-      });
-
-      if (!template) {
-        throw new NotFoundException('Screen template not found');
-      }
-
-      return this.normalizeTemplate(template);
+      );
     } catch (error) {
       this.logger.error(`Fetch template ${id} failed`, error.stack);
 
@@ -101,10 +122,14 @@ export class ScreenTemplateService {
     try {
       await this.findOne(id);
 
-      return await this.prisma.screenTemplate.update({
+      const updated = await this.prisma.screenTemplate.update({
         where: { id },
         data: dto,
       });
+
+      await this.invalidateAll();
+
+      return updated;
     } catch (error) {
       this.logger.error(`Update template ${id} failed`, error.stack);
 
@@ -118,9 +143,13 @@ export class ScreenTemplateService {
     try {
       await this.findOne(id);
 
-      return await this.prisma.screenTemplate.delete({
+      const deleted = await this.prisma.screenTemplate.delete({
         where: { id },
       });
+
+      await this.invalidateAll();
+
+      return deleted;
     } catch (error) {
       this.logger.error(`Delete template ${id} failed`, error.stack);
 
@@ -150,6 +179,8 @@ export class ScreenTemplateService {
         },
       });
 
+      await this.invalidateAll();
+
       return updated;
     } catch (error: any) {
       this.logger.error(
@@ -163,5 +194,9 @@ export class ScreenTemplateService {
         'Failed to toggle screen template status',
       );
     }
+  }
+
+  private async invalidateAll() {
+    await this.redisService.delPattern('screen-template:*');
   }
 }

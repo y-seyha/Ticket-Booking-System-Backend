@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { NotificationService } from '../notification/notification.service';
 import { CreateFoodCategoryDto } from './dto/create-food-category.dto';
 import { UpdateFoodCategoryDto } from './dto/update-food-category.dto';
@@ -20,30 +21,36 @@ import * as crypto from 'crypto';
 @Injectable()
 export class FoodAndBeverageService {
   private readonly logger = new Logger(FoodAndBeverageService.name);
+  private readonly ttlSeconds = 120;
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
     private readonly notificationService: NotificationService,
   ) {}
 
   /* ─── Categories ─────────────────────────────────── */
 
   async createCategory(dto: CreateFoodCategoryDto) {
-    return this.prisma.foodCategory.create({ data: dto });
+    const category = await this.prisma.foodCategory.create({ data: dto });
+    await this.invalidateMenu();
+    return category;
   }
 
   async getCategories() {
-    return this.prisma.foodCategory.findMany({
-      where: { isActive: true },
-      orderBy: { sortOrder: 'asc' },
-      include: {
-        items: {
-          where: { isActive: true },
-          orderBy: { sortOrder: 'asc' },
-          include: { image: true },
+    return this.redisService.getOrSet('f&b:categories', this.ttlSeconds, () =>
+      this.prisma.foodCategory.findMany({
+        where: { isActive: true },
+        orderBy: { sortOrder: 'asc' },
+        include: {
+          items: {
+            where: { isActive: true },
+            orderBy: { sortOrder: 'asc' },
+            include: { image: true },
+          },
         },
-      },
-    });
+      }),
+    );
   }
 
   async getAllCategories() {
@@ -57,7 +64,12 @@ export class FoodAndBeverageService {
       where: { id },
     });
     if (!existing) throw new NotFoundException('Food category not found');
-    return this.prisma.foodCategory.update({ where: { id }, data: dto });
+    const updated = await this.prisma.foodCategory.update({
+      where: { id },
+      data: dto,
+    });
+    await this.invalidateMenu();
+    return updated;
   }
 
   async deleteCategory(id: string) {
@@ -66,6 +78,7 @@ export class FoodAndBeverageService {
     });
     if (!existing) throw new NotFoundException('Food category not found');
     await this.prisma.foodCategory.delete({ where: { id } });
+    await this.invalidateMenu();
   }
 
   /* ─── Items ──────────────────────────────────────── */
@@ -75,36 +88,55 @@ export class FoodAndBeverageService {
       where: { id: dto.categoryId },
     });
     if (!category) throw new NotFoundException('Food category not found');
-    return this.prisma.foodItem.create({ data: dto });
+    const item = await this.prisma.foodItem.create({ data: dto });
+    await this.invalidateMenu();
+    return item;
   }
 
   async getItems(categoryId: string) {
-    return this.prisma.foodItem.findMany({
-      where: { categoryId, isActive: true },
-      orderBy: { sortOrder: 'asc' },
-      include: { image: true },
-    });
+    return this.redisService.getOrSet(
+      `f&b:items:${categoryId}`,
+      this.ttlSeconds,
+      () =>
+        this.prisma.foodItem.findMany({
+          where: { categoryId, isActive: true },
+          orderBy: { sortOrder: 'asc' },
+          include: { image: true },
+        }),
+    );
   }
 
   async getItem(id: string) {
-    const item = await this.prisma.foodItem.findUnique({
-      where: { id },
-      include: { image: true, category: true },
-    });
-    if (!item) throw new NotFoundException('Food item not found');
-    return item;
+    return this.redisService.getOrSet(
+      `f&b:item:${id}`,
+      this.ttlSeconds,
+      async () => {
+        const item = await this.prisma.foodItem.findUnique({
+          where: { id },
+          include: { image: true, category: true },
+        });
+        if (!item) throw new NotFoundException('Food item not found');
+        return item;
+      },
+    );
   }
 
   async updateItem(id: string, dto: UpdateFoodItemDto) {
     const existing = await this.prisma.foodItem.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Food item not found');
-    return this.prisma.foodItem.update({ where: { id }, data: dto });
+    const updated = await this.prisma.foodItem.update({
+      where: { id },
+      data: dto,
+    });
+    await this.invalidateMenu();
+    return updated;
   }
 
   async deleteItem(id: string) {
     const existing = await this.prisma.foodItem.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Food item not found');
     await this.prisma.foodItem.delete({ where: { id } });
+    await this.invalidateMenu();
   }
 
   async toggleItemStatus(id: string) {
@@ -114,6 +146,7 @@ export class FoodAndBeverageService {
       where: { id },
       data: { isActive: !existing.isActive },
     });
+    await this.invalidateMenu();
     return {
       message: `Item ${updated.isActive ? 'activated' : 'deactivated'}`,
     };
@@ -128,20 +161,23 @@ export class FoodAndBeverageService {
       where: { id },
       data: { isActive: !existing.isActive },
     });
+    await this.invalidateMenu();
     return {
       message: `Category ${updated.isActive ? 'activated' : 'deactivated'}`,
     };
   }
 
   async getAllItems() {
-    return this.prisma.foodItem.findMany({
-      where: { isActive: true },
-      orderBy: { sortOrder: 'asc' },
-      include: {
-        image: true,
-        category: true,
-      },
-    });
+    return this.redisService.getOrSet('f&b:items-all', this.ttlSeconds, () =>
+      this.prisma.foodItem.findMany({
+        where: { isActive: true },
+        orderBy: { sortOrder: 'asc' },
+        include: {
+          image: true,
+          category: true,
+        },
+      }),
+    );
   }
 
   async createBulkItems(dto: CreateBulkFoodItemDto) {
@@ -161,13 +197,17 @@ export class FoodAndBeverageService {
       sortOrder: dto.sortOrder,
     };
 
-    return Promise.all(
+    const result = await Promise.all(
       categoryIds.map((categoryId) =>
         this.prisma.foodItem.create({
           data: { ...itemData, categoryId },
         }),
       ),
     );
+
+    await this.invalidateMenu();
+
+    return result;
   }
 
   /* ─── Standalone Food Order ──────────────────────── */
@@ -397,5 +437,9 @@ export class FoodAndBeverageService {
 
       return { message: 'Food item removed from booking' };
     });
+  }
+
+  private async invalidateMenu() {
+    await this.redisService.delPattern('f&b:*');
   }
 }

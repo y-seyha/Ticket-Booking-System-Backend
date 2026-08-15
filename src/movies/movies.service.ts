@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Movie, MovieStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { CreateMovieDto } from './dto/create-movie.dto';
 import { UpdateMovieDto } from './dto/update-movie.dto';
 import { MovieQueryDto } from './dto/ movie-query.dto';
@@ -20,11 +21,13 @@ import { SearchService } from '../search/search.service';
 @Injectable()
 export class MoviesService {
   private readonly logger = new Logger(MoviesService.name);
+  private readonly ttlSeconds = 60;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly fileUploadService: FileUploadService,
     private readonly searchService: SearchService,
+    private readonly redisService: RedisService,
   ) {}
 
   async create(
@@ -60,6 +63,8 @@ export class MoviesService {
         poster: (movie as any).poster?.url ?? null,
       });
 
+      await this.invalidateAll();
+
       return movie;
     } catch (error) {
       this.logger.error('Failed to create movie', error?.stack);
@@ -69,77 +74,83 @@ export class MoviesService {
 
   async findAll(query: MovieQueryDto) {
     try {
-      const { page = 1, limit = 10, search, status, month } = query;
-
-      const skip = (page - 1) * limit;
-
-      const where: Prisma.MovieWhereInput = {
-        ...(status && {
-          status,
-        }),
-
-        ...(search && {
-          title: {
-            contains: search,
-            mode: 'insensitive',
-          },
-        }),
-      };
-
-      if (month) {
-       const [yearStr, monthStr] = month.split('-');
-        const year = parseInt(yearStr, 10);
-        const monthIndex = parseInt(monthStr, 10) - 1;
-
-        if (!isNaN(year) && !isNaN(monthIndex)) {
-          // First millisecond of the selected month
-          const startDate = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0, 0));
-          // First millisecond of the following month
-          const endDate = new Date(
-            Date.UTC(year, monthIndex + 1, 1, 0, 0, 0, 0),
-          );
-
-          where.releaseDate = {
-            gte: startDate,
-            lt: endDate,
-          };
-        }
-      }
-
-      const [movies, total] = await this.prisma.$transaction([
-        this.prisma.movie.findMany({
-          where,
-          skip,
-          take: limit,
-          orderBy: {
-            releaseDate: 'asc',
-          },
-          include: {
-            poster: true,
-          },
-        }),
-
-        this.prisma.movie.count({
-          where,
-        }),
-      ]);
-
-      return {
-        data: movies.map((m) => ({
-          ...m,
-          poster: m.poster?.url || null,
-        })),
-        pagination: {
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
-      };
+      return await this.redisService.getOrSet(
+        this.buildListCacheKey(query),
+        this.ttlSeconds,
+        () => this.queryMovies(query),
+      );
     } catch (error) {
       this.logger.error('Failed to fetch movies', error?.stack);
       throw new InternalServerErrorException('Failed to fetch movies');
     }
+  }
+
+  private async queryMovies(query: MovieQueryDto) {
+    const { page = 1, limit = 10, search, status, month } = query;
+
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.MovieWhereInput = {
+      ...(status && {
+        status,
+      }),
+
+      ...(search && {
+        title: {
+          contains: search,
+          mode: 'insensitive',
+        },
+      }),
+    };
+
+    if (month) {
+      const [yearStr, monthStr] = month.split('-');
+      const year = parseInt(yearStr, 10);
+      const monthIndex = parseInt(monthStr, 10) - 1;
+
+      if (!isNaN(year) && !isNaN(monthIndex)) {
+        const startDate = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0, 0));
+        const endDate = new Date(
+          Date.UTC(year, monthIndex + 1, 1, 0, 0, 0, 0),
+        );
+
+        where.releaseDate = {
+          gte: startDate,
+          lt: endDate,
+        };
+      }
+    }
+
+    const [movies, total] = await this.prisma.$transaction([
+      this.prisma.movie.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: {
+          releaseDate: 'asc',
+        },
+        include: {
+          poster: true,
+        },
+      }),
+
+      this.prisma.movie.count({
+        where,
+      }),
+    ]);
+
+    return {
+      data: movies.map((m) => ({
+        ...m,
+        poster: m.poster?.url || null,
+      })),
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: string, date?: string) {
@@ -196,26 +207,59 @@ export class MoviesService {
         };
       }
 
-      const movie = await this.prisma.movie.findUnique({
-        where: { id },
-        include: {
-          poster: true,
-          showtimes: {
-            where: showtimeDateFilter,
-            include: {
-              screen: {
-                include: {
-                  theater: {
-                    include: {
-                      image: true,
-                    },
+      const result = await this.redisService.getOrSet(
+        this.buildDetailCacheKey(id, date),
+        this.ttlSeconds,
+        async () => {
+          const movie = await this.queryMovieDetail(
+            id,
+            showtimeDateFilter,
+          );
+
+          if (!movie) {
+            throw new NotFoundException('Movie not found');
+          }
+
+          if (movie.showtimes) {
+            movie.showtimes.sort(
+              (a, b) => a.startTime.getTime() - b.startTime.getTime(),
+            );
+          }
+
+          return this.transformMovieResponse(movie);
+        },
+      );
+
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to fetch movie ${id}`, error?.stack);
+      throw error;
+    }
+  }
+
+  private async queryMovieDetail(
+    id: string,
+    showtimeDateFilter: Prisma.ShowtimeWhereInput,
+  ) {
+    return this.prisma.movie.findUnique({
+      where: { id },
+      include: {
+        poster: true,
+        showtimes: {
+          where: showtimeDateFilter,
+          include: {
+            screen: {
+              include: {
+                theater: {
+                  include: {
+                    image: true,
                   },
-                  template: {
-                    include: {
-                      layouts: {
-                        include: {
-                          seats: true,
-                        },
+                },
+                template: {
+                  include: {
+                    layouts: {
+                      include: {
+                        seats: true,
                       },
                     },
                   },
@@ -224,23 +268,8 @@ export class MoviesService {
             },
           },
         },
-      });
-
-      if (!movie) {
-        throw new NotFoundException('Movie not found');
-      }
-
-      if (movie.showtimes) {
-        movie.showtimes.sort(
-          (a, b) => a.startTime.getTime() - b.startTime.getTime(),
-        );
-      }
-
-      return this.transformMovieResponse(movie);
-    } catch (error) {
-      this.logger.error(`Failed to fetch movie ${id}`, error?.stack);
-      throw error;
-    }
+      },
+    });
   }
 
   private transformMovieResponse(movie: any) {
@@ -359,6 +388,8 @@ export class MoviesService {
         poster: (updated as any).poster?.url ?? null,
       });
 
+      await this.invalidateAll();
+
       return updated;
     } catch (error) {
       this.logger.error(`Failed to update movie ${id}`, error?.stack);
@@ -396,6 +427,8 @@ export class MoviesService {
       });
 
       await this.searchService.removeMovie(id);
+
+      await this.invalidateAll();
 
       this.logger.log(`Movie deleted successfully: ${id}`);
 
@@ -450,6 +483,8 @@ export class MoviesService {
         poster: (statusUpdated as any).poster?.url ?? null,
       });
 
+      await this.invalidateAll();
+
       return statusUpdated;
     } catch (error) {
       this.logger.error(`Failed to update movie status ${id}`, error?.stack);
@@ -467,5 +502,25 @@ export class MoviesService {
     release.setHours(0, 0, 0, 0);
 
     return release > now ? MovieStatus.COMING_SOON : MovieStatus.NOW_SHOWING;
+  }
+
+  private buildListCacheKey(query: MovieQueryDto): string {
+    const signature = JSON.stringify({
+      page: query.page ?? 1,
+      limit: query.limit ?? 10,
+      search: query.search ?? null,
+      status: query.status ?? null,
+      month: query.month ?? null,
+    });
+
+    return `movies:list:${signature}`;
+  }
+
+  private buildDetailCacheKey(id: string, date?: string): string {
+    return `movies:one:${id}:${date ?? 'any'}`;
+  }
+
+  private async invalidateAll() {
+    await this.redisService.delPattern('movies:*');
   }
 }
