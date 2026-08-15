@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ScreenTemplateService } from './screen-template.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import {
   NotFoundException,
   InternalServerErrorException,
@@ -13,6 +14,17 @@ describe('ScreenTemplateService', () => {
   const mockLogger = {
     log: jest.fn(),
     error: jest.fn(),
+  };
+
+  const mockRedis = {
+    isReady: jest.fn(() => true),
+    getJson: jest.fn(async () => null),
+    setJson: jest.fn(),
+    del: jest.fn(),
+    delPattern: jest.fn(),
+    getOrSet: jest.fn(async (_key: string, _ttl: number, loader: () => unknown) =>
+      loader(),
+    ),
   };
 
   const mockPrisma = {
@@ -32,6 +44,7 @@ describe('ScreenTemplateService', () => {
       providers: [
         ScreenTemplateService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: RedisService, useValue: mockRedis },
       ],
     }).compile();
 

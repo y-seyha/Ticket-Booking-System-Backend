@@ -1,7 +1,9 @@
 import { Test } from '@nestjs/testing';
 import { MoviesService } from './movies.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { FileUploadService } from '../file-upload/file-upload.service';
+import { SearchService } from '../search/search.service';
 import {
   NotFoundException,
   InternalServerErrorException,
@@ -10,6 +12,17 @@ import { Logger } from '@nestjs/common';
 
 describe('MoviesService', () => {
   let service: MoviesService;
+
+  const redisMock = {
+    isReady: jest.fn(() => true),
+    getJson: jest.fn(async () => null),
+    setJson: jest.fn(),
+    del: jest.fn(),
+    delPattern: jest.fn(),
+    getOrSet: jest.fn(async (_key: string, _ttl: number, loader: () => unknown) =>
+      loader(),
+    ),
+  };
 
   const prismaMock = {
     movie: {
@@ -34,6 +47,11 @@ describe('MoviesService', () => {
     },
   };
 
+  const searchServiceMock = {
+    indexMovie: jest.fn(),
+    removeMovie: jest.fn(),
+  };
+
   beforeAll(() => {
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
@@ -44,7 +62,9 @@ describe('MoviesService', () => {
       providers: [
         MoviesService,
         { provide: PrismaService, useValue: prismaMock },
+        { provide: RedisService, useValue: redisMock },
         { provide: FileUploadService, useValue: fileUploadServiceMock },
+        { provide: SearchService, useValue: searchServiceMock },
       ],
     }).compile();
 
@@ -138,7 +158,10 @@ describe('MoviesService', () => {
 
   describe('findOne', () => {
     it('should return movie', async () => {
-      prismaMock.movie.findUnique.mockResolvedValue({ id: '1' });
+      prismaMock.movie.findUnique.mockResolvedValue({
+        id: '1',
+        showtimes: [],
+      });
 
       const res = await service.findOne('1');
 

@@ -1,34 +1,49 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 
 @Injectable()
 export class SettingsService {
   private readonly logger = new Logger(SettingsService.name);
+  private readonly ttlSeconds = 300;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
+  ) {}
 
   async findAll() {
     this.logger.log('Fetching all settings');
-    const settings = await this.prisma.systemSetting.findMany({
-      orderBy: [{ category: 'asc' }, { key: 'asc' }],
-    });
+    return this.redisService.getOrSet(
+      'settings:all',
+      this.ttlSeconds,
+      async () => {
+        const settings = await this.prisma.systemSetting.findMany({
+          orderBy: [{ category: 'asc' }, { key: 'asc' }],
+        });
 
-    const grouped: Record<string, typeof settings> = {};
-    for (const setting of settings) {
-      if (!grouped[setting.category]) grouped[setting.category] = [];
-      grouped[setting.category].push(setting);
-    }
+        const grouped: Record<string, typeof settings> = {};
+        for (const setting of settings) {
+          if (!grouped[setting.category]) grouped[setting.category] = [];
+          grouped[setting.category].push(setting);
+        }
 
-    return grouped;
+        return grouped;
+      },
+    );
   }
 
   async findOne(key: string) {
     this.logger.log(`Fetching setting: ${key}`);
-    const setting = await this.prisma.systemSetting.findUnique({
-      where: { key },
-    });
-    return setting;
+    return this.redisService.getOrSet(
+      `settings:one:${key}`,
+      this.ttlSeconds,
+      () =>
+        this.prisma.systemSetting.findUnique({
+          where: { key },
+        }),
+    );
   }
 
   async updateAll(dto: UpdateSettingsDto) {
@@ -44,8 +59,11 @@ export class SettingsService {
           where: { key },
           data: { value: String(value) },
         });
+        await this.redisService.del(`settings:one:${key}`);
       }
     }
+
+    await this.redisService.del('settings:all');
 
     return results;
   }

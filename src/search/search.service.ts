@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { Client } from '@opensearch-project/opensearch';
 import type {
   SearchResult,
@@ -34,12 +35,14 @@ interface TheaterDocument {
 @Injectable()
 export class SearchService implements OnModuleInit {
   private readonly logger = new Logger(SearchService.name);
+  private readonly ttlSeconds = 120;
   private client: Client | null = null;
   private enabled = false;
 
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
   ) {}
 
   async onModuleInit() {
@@ -155,6 +158,8 @@ export class SearchService implements OnModuleInit {
       body: doc,
       refresh: 'false',
     }).catch((err) => this.logger.error('Failed to index movie', err));
+
+    await this.invalidateAll();
   }
 
   async removeMovie(id: string) {
@@ -163,6 +168,8 @@ export class SearchService implements OnModuleInit {
       index: MOVIES_INDEX,
       id,
     }).catch(() => {});
+
+    await this.invalidateAll();
   }
 
   async indexTheater(theater: {
@@ -186,6 +193,8 @@ export class SearchService implements OnModuleInit {
       body: doc,
       refresh: 'false',
     }).catch((err) => this.logger.error('Failed to index theater', err));
+
+    await this.invalidateAll();
   }
 
   async removeTheater(id: string) {
@@ -194,22 +203,36 @@ export class SearchService implements OnModuleInit {
       index: THEATERS_INDEX,
       id,
     }).catch(() => {});
+
+    await this.invalidateAll();
   }
 
   // --- Searching ---
 
   async search(query?: string, limit = 20): Promise<SearchResult> {
-    if (this.enabled) {
-      return this.searchOpenSearch(query, limit);
-    }
-    return this.searchDatabase(query, limit);
+    return this.redisService.getOrSet(
+      `search:q:${query ?? ''}:${limit}`,
+      this.ttlSeconds,
+      () => {
+        if (this.enabled) {
+          return this.searchOpenSearch(query, limit);
+        }
+        return this.searchDatabase(query, limit);
+      },
+    );
   }
 
   async autocomplete(query: string): Promise<AutocompleteResult> {
-    if (this.enabled) {
-      return this.autocompleteOpenSearch(query);
-    }
-    return this.autocompleteDatabase(query);
+    return this.redisService.getOrSet(
+      `search:ac:${query}`,
+      this.ttlSeconds,
+      () => {
+        if (this.enabled) {
+          return this.autocompleteOpenSearch(query);
+        }
+        return this.autocompleteDatabase(query);
+      },
+    );
   }
 
   private async searchOpenSearch(
@@ -345,5 +368,9 @@ export class SearchService implements OnModuleInit {
         id: m.id,
       })),
     };
+  }
+
+  private async invalidateAll() {
+    await this.redisService.delPattern('search:*');
   }
 }
